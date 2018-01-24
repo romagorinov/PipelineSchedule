@@ -1,0 +1,16 @@
+D:\Projects\GitHub\PipelineSchedule\Show\bin\Release\Accord.dll.config
+D:\Projects\GitHub\PipelineSchedule\Show\bin\Release\Show.dll
+D:\Projects\GitHub\PipelineSchedule\Show\bin\Release\Show.pdb
+D:\Projects\GitHub\PipelineSchedule\Show\bin\Release\IdealPoint.dll
+D:\Projects\GitHub\PipelineSchedule\Show\bin\Release\MIConvexHull.dll
+D:\Projects\GitHub\PipelineSchedule\Show\bin\Release\Accord.Math.dll
+D:\Projects\GitHub\PipelineSchedule\Show\bin\Release\Accord.dll
+D:\Projects\GitHub\PipelineSchedule\Show\bin\Release\Accord.Math.Core.dll
+D:\Projects\GitHub\PipelineSchedule\Show\bin\Release\IdealPoint.pdb
+D:\Projects\GitHub\PipelineSchedule\Show\bin\Release\MIConvexHull.pdb
+D:\Projects\GitHub\PipelineSchedule\Show\bin\Release\Accord.Math.xml
+D:\Projects\GitHub\PipelineSchedule\Show\bin\Release\Accord.xml
+D:\Projects\GitHub\PipelineSchedule\Show\bin\Release\Accord.Math.Core.xml
+D:\Projects\GitHub\PipelineSchedule\Show\obj\Release\Show.csprojResolveAssemblyReference.cache
+D:\Projects\GitHub\PipelineSchedule\Show\obj\Release\Show.dll
+D:\Projects\GitHub\PipelineSchedule\Show\obj\Release\Show.pdb
