@@ -18,9 +18,10 @@ namespace Pipeline
     {
         #region Структура
 
-        public List<Pipe> pipes = new List<Pipe>();
+        public List<SubSection> pipes = new List<SubSection>();
         public List<NamedObject> points = new List<NamedObject>();
         public List<Regime> regimes = new List<Regime>();
+        public Dictionary<string, List<Tuple<double, double[]>>> sectionRepairs = new Dictionary<string, List<Tuple<double, double[]>>>();
 
         #endregion
 
@@ -54,244 +55,106 @@ namespace Pipeline
                 output1 = new IOObject("У НПЗ"),
                 output2 = new IOObject("ж/д Светлый");
 
-            Pipe pipe1 = new Pipe("ТУ0") { TechnologicalSectionName = "ТУ0", Source = mainInput, Target = rp1, MaxFlows = AlgorithmHelper.CreateListOfElements(Period, 51.1 / 24) },
-                pipe2_in = new Pipe("ТУ1 вход") { TechnologicalSectionName = "ТУ1", Source = rp1 },
-                pipe2_1 = new Pipe("ТУ1 подкачка 1") { TechnologicalSectionName = "ТУ1", Source = input1, MaxFlows = AlgorithmHelper.CreateListOfElements(Period, bigMaxflowValue) },
-                pipe2_2 = new Pipe("ТУ1 подкачка 2") { TechnologicalSectionName = "ТУ1", Source = input2, MaxFlows = AlgorithmHelper.CreateListOfElements(Period, bigMaxflowValue) },
-                pipe2_out = new Pipe("ТУ1 выход") { TechnologicalSectionName = "ТУ1", Target = rp2 },
-                pipe3 = new Pipe("ТУ2") { TechnologicalSectionName = "ТУ2", Source = rp2, Target = rp3 },
-                pipe4_in = new Pipe("ТУ3 вход") { TechnologicalSectionName = "ТУ3", Source = rp3},
-                pipe4_1 = new Pipe("ТУ3 откачка ж/д Светлый") { TechnologicalSectionName = "ТУ3", Target = output2, MaxFlows = AlgorithmHelper.CreateListOfElements(Period, bigMaxflowValue) },
-                pipe4_out = new Pipe("ТУ3 вход") { TechnologicalSectionName = "ТУ3", Target = mainOutput },
-                pipe5 = new Pipe("Труба откачка У НПЗ") { TechnologicalSectionName = "Откачка У НПЗ", Source = rp2, Target = output1, MaxFlows = AlgorithmHelper.CreateListOfElements(Period, 21.6 / 24) },
-                pipe6 = new Pipe("Труба подкачка ГНПС 2") { TechnologicalSectionName = "Подкачка ГНПС 2", Source = input3, Target = rp2, MaxFlows = AlgorithmHelper.CreateListOfElements(Period, 10.0 / 24) };
-            
+            SubSection pipe1 = new SubSection("ТУ0", mainInput, rp1, "ТУ0", 51.1 / 24),
+                pipe2_in = new SubSection("ТУ1 вход", rp1, null, "ТУ1"),
+                pipe2_1 = new SubSection("ТУ1 подкачка 1", input1, null, "ТУ1"),
+                pipe2_2 = new SubSection("ТУ1 подкачка 2", input2, null, "ТУ1"),
+                pipe2_out = new SubSection("ТУ1 выход", null, rp2, "ТУ1", 69.3 / 24),
+                pipe3 = new SubSection("ТУ2", rp2, rp3, "ТУ2", 64.3 / 24),
+                pipe4_in = new SubSection("ТУ3 вход", rp3, null, "ТУ3"),
+                pipe4_1 = new SubSection("ТУ3 откачка ж/д Светлый", null, output2, "ТУ3"),
+                pipe4_out = new SubSection("ТУ3 вход", null, mainInput, "ТУ3", 54.5 / 24),
+                pipe5 = new SubSection("Труба откачка У НПЗ", rp2, output1, "Труба откачка У НПЗ", 21.6 / 24),
+                pipe6 = new SubSection("Труба подкачка ГНПС 2", input3, rp2, "Труба подкачка ГНПС 2");
+
+            points = new List<NamedObject>() { rp1, rp2, rp3, mainInput, mainOutput, input1, input2, input3, output1, output2 };
+            pipes = new List<SubSection>() { pipe1, pipe2_in, pipe2_1, pipe2_2, pipe2_out, pipe3, pipe4_in, pipe4_1, pipe4_out, pipe5, pipe6 };
+
             //////////////////////
             // Ремонты
             //////////////////////
-            DiscreteSchedule pipe2MaxFlow = new DiscreteSchedule(Period, bigMaxflowValue);
-            pipe2MaxFlow.FillInterval(61.5 / 24, 10 * 24 + 12, 10 * 24 + 13);
-            pipe2MaxFlow.FillInterval(46.1 / 24, 11 * 24 + 12, 11 * 24 + 16);
-            pipe2MaxFlow.FillInterval(61.5 / 24, 12 * 24 + 12, 12 * 24 + 14);
-            pipe2MaxFlow.FillInterval(53.5 / 24, 17 * 24 + 12, 17 * 24 + 16);
-            pipe2MaxFlow.FillInterval(46.1 / 24, 18 * 24 + 12, 18 * 24 + 14);
-            pipe2MaxFlow.FillInterval(46.1 / 24, 26 * 24 + 12, 26 * 24 + 14);
-            pipe2_out.MaxFlows = pipe2MaxFlow.ToList();
-            pipe2_in.MaxFlows = pipe2MaxFlow.ToList();
-            DiscreteSchedule pipe3MaxFlow = new DiscreteSchedule(Period, bigMaxflowValue);
-            pipe3MaxFlow.FillInterval(56.1 / 24, 10 * 24 + 12, 10 * 24 + 14);
-            pipe3MaxFlow.FillInterval(56.1 / 24, 11 * 24 + 12, 11 * 24 + 14);
-            pipe3MaxFlow.FillInterval(56.1 / 24, 12 * 24 + 12, 12 * 24 + 14);
-            pipe3MaxFlow.FillInterval(56.1 / 24, 13 * 24 + 12, 13 * 24 + 14);
-            pipe3MaxFlow.FillInterval(56.1 / 24, 24 * 24 + 12, 24 * 24 + 14);
-            pipe3MaxFlow.FillInterval(56.1 / 24, 25 * 24 + 12, 25 * 24 + 14);
-            pipe3MaxFlow.FillInterval(56.1 / 24, 26 * 24 + 12, 26 * 24 + 14);
-            pipe3MaxFlow.FillInterval(56.1 / 24, 27 * 24 + 12, 27 * 24 + 14);
-            pipe3.MaxFlows = pipe3MaxFlow.ToList();
-            DiscreteSchedule pipe4MaxFlow = new DiscreteSchedule(Period, bigMaxflowValue);
-            pipe4MaxFlow.FillInterval(47.3 / 24, 17 * 24 + 12, 17 * 24 + 14);
-            pipe4MaxFlow.FillInterval(47.3 / 24, 18 * 24 + 12, 18 * 24 + 14);
-            pipe4MaxFlow.FillInterval(32.2 / 24, 19 * 24 + 12, 19 * 24 + 16);
-            pipe4MaxFlow.FillInterval(47.3 / 24, 20 * 24 + 12, 20 * 24 + 14);
-            pipe4MaxFlow.FillInterval(47.3 / 24, 24 * 24 + 12, 24 * 24 + 14);
-            pipe4MaxFlow.FillInterval(47.3 / 24, 25 * 24 + 12, 25 * 24 + 14);
-            pipe4MaxFlow.FillInterval(33 / 24, 26 * 24 + 12, 26 * 24 + 16);
-            pipe4MaxFlow.FillInterval(47.3 / 24, 27 * 24 + 12, 27 * 24 + 14);
-            pipe4_out.MaxFlows = pipe4MaxFlow.ToList();
-            pipe4_in.MaxFlows = pipe4MaxFlow.ToList();
-
-            points = new List<NamedObject>() { rp1, rp2, rp3, mainInput, mainOutput, input1, input2, input3, output1, output2 };
-            pipes = new List<Pipe>() { pipe1, pipe2_in, pipe2_1, pipe2_2, pipe2_out, pipe3, pipe4_in, pipe4_1, pipe4_out, pipe5, pipe6 };
+            DiscreteSchedule tu1MainRepairs = new DiscreteSchedule(Period, bigMaxflowValue);
+            tu1MainRepairs.FillInterval(61.5 / 24, 10 * 24 + 12, 10 * 24 + 13);
+            tu1MainRepairs.FillInterval(46.1 / 24, 11 * 24 + 12, 11 * 24 + 16);
+            tu1MainRepairs.FillInterval(61.5 / 24, 12 * 24 + 12, 12 * 24 + 14);
+            tu1MainRepairs.FillInterval(53.5 / 24, 17 * 24 + 12, 17 * 24 + 16);
+            tu1MainRepairs.FillInterval(46.1 / 24, 18 * 24 + 12, 18 * 24 + 14);
+            tu1MainRepairs.FillInterval(46.1 / 24, 26 * 24 + 12, 26 * 24 + 14);
+            var tu1Rep = tu1MainRepairs.ToList().Select(x => new Tuple<double, double[]>(x, new double[] { bigMaxflowValue, bigMaxflowValue })).ToList();
+            DiscreteSchedule tu2MainRepairs = new DiscreteSchedule(Period, bigMaxflowValue);
+            tu2MainRepairs.FillInterval(56.1 / 24, 10 * 24 + 12, 10 * 24 + 14);
+            tu2MainRepairs.FillInterval(56.1 / 24, 11 * 24 + 12, 11 * 24 + 14);
+            tu2MainRepairs.FillInterval(56.1 / 24, 12 * 24 + 12, 12 * 24 + 14);
+            tu2MainRepairs.FillInterval(56.1 / 24, 13 * 24 + 12, 13 * 24 + 14);
+            tu2MainRepairs.FillInterval(56.1 / 24, 24 * 24 + 12, 24 * 24 + 14);
+            tu2MainRepairs.FillInterval(56.1 / 24, 25 * 24 + 12, 25 * 24 + 14);
+            tu2MainRepairs.FillInterval(56.1 / 24, 26 * 24 + 12, 26 * 24 + 14);
+            tu2MainRepairs.FillInterval(56.1 / 24, 27 * 24 + 12, 27 * 24 + 14);
+            var tu2Rep = tu2MainRepairs.ToList().Select(x => new Tuple<double, double[]>(x, new double[] { })).ToList();
+            DiscreteSchedule tu3MainRepairs = new DiscreteSchedule(Period, bigMaxflowValue);
+            tu3MainRepairs.FillInterval(47.3 / 24, 17 * 24 + 12, 17 * 24 + 14);
+            tu3MainRepairs.FillInterval(47.3 / 24, 18 * 24 + 12, 18 * 24 + 14);
+            tu3MainRepairs.FillInterval(32.2 / 24, 19 * 24 + 12, 19 * 24 + 16);
+            tu3MainRepairs.FillInterval(47.3 / 24, 20 * 24 + 12, 20 * 24 + 14);
+            tu3MainRepairs.FillInterval(47.3 / 24, 24 * 24 + 12, 24 * 24 + 14);
+            tu3MainRepairs.FillInterval(47.3 / 24, 25 * 24 + 12, 25 * 24 + 14);
+            tu3MainRepairs.FillInterval(33 / 24, 26 * 24 + 12, 26 * 24 + 16);
+            tu3MainRepairs.FillInterval(47.3 / 24, 27 * 24 + 12, 27 * 24 + 14);
+            var tu3Rep = tu3MainRepairs.ToList().Select(x => new Tuple<double, double[]>(x, new double[] { bigMaxflowValue })).ToList();
+            sectionRepairs = new Dictionary<string, List<Tuple<double, double[]>>>()
+            {
+                {"ТУ1",  tu1Rep},
+                {"ТУ2", tu2Rep },
+                {"ТУ3", tu3Rep },
+                {"ТУ0", AlgorithmHelper.CreateListOfElements(Period, bigMaxflowValue).Select(x => new Tuple<double, double[]>(bigMaxflowValue,  new double[] { })).ToList() },
+                {"Труба подкачка ГНПС 2", AlgorithmHelper.CreateListOfElements(Period, bigMaxflowValue).Select(x => new Tuple<double, double[]>(bigMaxflowValue,  new double[] { })).ToList() },
+                {"Труба откачка У НПЗ", AlgorithmHelper.CreateListOfElements(Period, bigMaxflowValue).Select(x => new Tuple<double, double[]>(bigMaxflowValue,  new double[] { })).ToList() }
+            };
 
             /////////////////////
             // Режимы
             /////////////////////
             // Первый ТУ
-            regimes.Add(new Regime("ТУ1", "1.2-0-0-0-0-0", 10, new Dictionary<Pipe, double>()
-            {
-                { pipe2_in, 14.4 },
-                { pipe2_1, 6.552 },
-                { pipe2_2, 0.696 },
-                { pipe2_out, 21.648 }
-            }));
-            regimes.Add(new Regime("ТУ1", "10.22-22-2-22-22-2", 10, new Dictionary<Pipe, double>()
-            {
-                { pipe2_in, 51.84 },
-                { pipe2_1, 6.66 },
-                { pipe2_2, 0.516 },
-                { pipe2_out, 59.016 }
-            }));
-            regimes.Add(new Regime("ТУ1", "12.22-22-22-22-22-12", 10, new Dictionary<Pipe, double>()
-            {
-                { pipe2_in, 55.2 },
-                { pipe2_1, 5.292 },
-                { pipe2_2, 1.032 },
-                { pipe2_out, 61.524 }
-            }));
-            regimes.Add(new Regime("ТУ1", "13.522-22-22-22-22-22", 10, new Dictionary<Pipe, double>()
-            {
-                { pipe2_in, 54.576 },
-                { pipe2_1, 7.512 },
-                { pipe2_2, 0.432 },
-                { pipe2_out, 62.52 }
-            }));
-            regimes.Add(new Regime("ТУ1", "14.222-22-22-222-22-22", 10, new Dictionary<Pipe, double>()
-            {
-                { pipe2_in, 58.416 },
-                { pipe2_1, 5.112 },
-                { pipe2_2, 1.152 },
-                { pipe2_out, 64.68 }
-            }));
-            regimes.Add(new Regime("ТУ1", "16.222-222-22-222-222-22", 10, new Dictionary<Pipe, double>()
-            {
-                { pipe2_in, 61.68 },
-                { pipe2_1, 5.016 },
-                { pipe2_2, 1.344 },
-                { pipe2_out, 68.04 }
-            }));
-            regimes.Add(new Regime("ТУ1", "17.222-222-222-222-222-22", 10, new Dictionary<Pipe, double>()
-            {
-                { pipe2_in, 62.5 },
-                { pipe2_1, 5.4 },
-                { pipe2_2, 1.4 },
-                { pipe2_out, 69.32640234375 }
-            }));
-            regimes.Add(new Regime("ТУ1", "2.2-0-0-2-0-0", 10, new Dictionary<Pipe, double>()
-            {
-                { pipe2_in, 23.4 },
-                { pipe2_1, 6.3 },
-                { pipe2_2, 0.7 },
-                { pipe2_out, 30.444 }
-            }));
-            regimes.Add(new Regime("ТУ1", "3.2-2-0-2-0-0", 10, new Dictionary<Pipe, double>()
-            {
-                { pipe2_in, 24.8 },
-                { pipe2_1, 7.2 },
-                { pipe2_2, 0.7 },
-                { pipe2_out, 32.748 }
-            }));
-            regimes.Add(new Regime("ТУ1", "4.2-2-0-2-2-0", 10, new Dictionary<Pipe, double>()
-            {
-                { pipe2_in, 33.4 },
-                { pipe2_1, 6.2 },
-                { pipe2_2, 0.8 },
-                { pipe2_out, 40.4172 }
-            }));
-            regimes.Add(new Regime("ТУ1", "6.2-2-2-2-2-1", 10, new Dictionary<Pipe, double>()
-            {
-                { pipe2_in, 38.8 },
-                { pipe2_1, 6.6 },
-                { pipe2_2, 0.7 },
-                { pipe2_out, 46.146 }
-            }));
-            regimes.Add(new Regime("ТУ1", "7.22-2-2-2-2-2", 10, new Dictionary<Pipe, double>()
-            {
-                { pipe2_in, 43.4 },
-                { pipe2_1, 6.6 },
-                { pipe2_2, 0.7 },
-                { pipe2_out, 50.728 }
-            }));
-            regimes.Add(new Regime("ТУ1", "8.22-2-2-22-2-2", 10, new Dictionary<Pipe, double>()
-            {
-                { pipe2_in, 46.62 },
-                { pipe2_1, 6.168 },
-                { pipe2_2, 0.684 },
-                { pipe2_out, 53.46857 }
-            }));
+            regimes.Add(new Regime("ТУ1", "1.2-0-0-0-0-0", 10, new Tuple<double, double[][]>(14.4, new double[][] { new double[] { 0, 6.552 }, new double[] {0, 0.696 }})));
+            regimes.Add(new Regime("ТУ1", "10.22-22-2-22-22-2", 10, new Tuple<double, double[][]>(51.84, new double[][] { new double[] { 0, 6.66 }, new double[] { 0, 0.516 } })));
+            regimes.Add(new Regime("ТУ1", "12.22-22-22-22-22-12", 10, new Tuple<double, double[][]>(55.2, new double[][] { new double[] { 0, 5.292 }, new double[] { 0, 1.032 } })));
+            regimes.Add(new Regime("ТУ1", "13.522-22-22-22-22-22", 10, new Tuple<double, double[][]>(54.576, new double[][] { new double[] { 0, 7.512 }, new double[] { 0, 0.432 } })));
+            regimes.Add(new Regime("ТУ1", "14.222-22-22-222-22-22", 10, new Tuple<double, double[][]>(58.416, new double[][] { new double[] { 0, 5.112 }, new double[] { 0, 1.152 } })));
+            regimes.Add(new Regime("ТУ1", "16.222-222-22-222-222-22", 10, new Tuple<double, double[][]>(61.68, new double[][] { new double[] { 0, 5.016 }, new double[] { 0, 1.344 } })));
+            regimes.Add(new Regime("ТУ1", "17.222-222-222-222-222-22", 10, new Tuple<double, double[][]>(62.5, new double[][] { new double[] { 0, 5.4 }, new double[] { 0, 1.4 } })));
+            regimes.Add(new Regime("ТУ1", "2.2-0-0-2-0-0", 10, new Tuple<double, double[][]>(23.4, new double[][] { new double[] { 0, 6.3 }, new double[] { 0, 0.7 } })));
+            regimes.Add(new Regime("ТУ1", "3.2-2-0-2-0-0", 10, new Tuple<double, double[][]>(24.8, new double[][] { new double[] { 0, 7.2 }, new double[] { 0, 0.7 } })));
+            regimes.Add(new Regime("ТУ1", "4.2-2-0-2-2-0", 10, new Tuple<double, double[][]>(33.4, new double[][] { new double[] { 0, 6.2 }, new double[] { 0, 0.8 } })));
+            regimes.Add(new Regime("ТУ1", "6.2-2-2-2-2-1", 10, new Tuple<double, double[][]>(38.8, new double[][] { new double[] { 0, 6.6 }, new double[] { 0, 0.7 } })));
+            regimes.Add(new Regime("ТУ1", "7.22-2-2-2-2-2", 10, new Tuple<double, double[][]>(43.4, new double[][] { new double[] { 0, 6.6 }, new double[] { 0, 0.7 } })));
+            regimes.Add(new Regime("ТУ1", "8.22-2-2-22-2-2", 10, new Tuple<double, double[][]>(46.62, new double[][] { new double[] { 0, 6.168 }, new double[] { 0, 0.684 } })));
+
             // Второй ТУ
-            regimes.Add(new Regime("ТУ2", "1.1-0-0-0", 10, new Dictionary<Pipe, double>() {
-                { pipe3, 14.76 }
-            }));
-            regimes.Add(new Regime("ТУ2", "10.33-11-511-511", 10, new Dictionary<Pipe, double>() {
-                { pipe3, 62.904 }
-            }));
-            regimes.Add(new Regime("ТУ2", "2.3-1-0-0", 10, new Dictionary<Pipe, double>() {
-                { pipe3, 24 }
-            }));
-            regimes.Add(new Regime("ТУ2", "4.1-5-5-5", 10, new Dictionary<Pipe, double>() {
-                { pipe3, 37.4 }
-            }));
-            regimes.Add(new Regime("ТУ2", "4.3-1-1-1", 10, new Dictionary<Pipe, double>() {
-                { pipe3, 40.6 }
-            }));
-            regimes.Add(new Regime("ТУ2", "5.13-1-1-1", 10, new Dictionary<Pipe, double>() {
-                { pipe3, 44.3 }
-            }));
-            regimes.Add(new Regime("ТУ2", "6.13-1-11-1", 10, new Dictionary<Pipe, double>() {
-                { pipe3, 48.428841796875 }
-            }));
-            regimes.Add(new Regime("ТУ2", "8.31-11-51-11", 10, new Dictionary<Pipe, double>() {
-                { pipe3, 56.064 }
-            }));
-            regimes.Add(new Regime("ТУ2", "8.31-51-11-51", 10, new Dictionary<Pipe, double>() {
-                { pipe3, 54.1 }
-            }));
+            regimes.Add(new Regime("ТУ2", "1.1-0-0-0", 10, new Tuple<double, double[][]>(14.76, new double[][] { })));
+            regimes.Add(new Regime("ТУ2", "10.33-11-511-511", 10, new Tuple<double, double[][]>(62.904, new double[][] { })));
+            regimes.Add(new Regime("ТУ2", "2.3-1-0-0", 10, new Tuple<double, double[][]>(24, new double[][] { })));
+            regimes.Add(new Regime("ТУ2", "4.1-5-5-5", 10, new Tuple<double, double[][]>(37.4, new double[][] { })));
+            regimes.Add(new Regime("ТУ2", "4.3-1-1-1", 10, new Tuple<double, double[][]>(40.6, new double[][] { })));
+            regimes.Add(new Regime("ТУ2", "5.13-1-1-1", 10, new Tuple<double, double[][]>(44.3, new double[][] { })));
+            regimes.Add(new Regime("ТУ2", "6.13-1-11-1", 10, new Tuple<double, double[][]>(48.428841796875, new double[][] { })));
+            regimes.Add(new Regime("ТУ2", "8.31-11-51-11", 10, new Tuple<double, double[][]>(56.064, new double[][] { })));
+            regimes.Add(new Regime("ТУ2", "8.31-51-11-51", 10, new Tuple<double, double[][]>(54.1, new double[][] { })));
+
             // Третий ТУ
-            regimes.Add(new Regime("ТУ3", "10.511-11-511-11 с отбором", 10, new Dictionary<Pipe, double>() {
-                { pipe4_in, 51.4 },
-                { pipe4_1, 2.8 },
-                { pipe4_out, 48.6 }
-            }));
-            regimes.Add(new Regime("ТУ3", "12.511-511-511-151", 10, new Dictionary<Pipe, double>() {
-                { pipe4_in, 54.48 },
-                { pipe4_1, 0 },
-                { pipe4_out, 54.48 }
-            }));
-            regimes.Add(new Regime("ТУ3", "2.1-1-0-0", 10, new Dictionary<Pipe, double>() {
-                { pipe4_in, 18 },
-                { pipe4_1, 0 },
-                { pipe4_out, 18 }
-            }));
-            regimes.Add(new Regime("ТУ3", "3.1-1-1-0", 10, new Dictionary<Pipe, double>() {
-                { pipe4_in, 26.124 },
-                { pipe4_1, 0 },
-                { pipe4_out, 26.124 }
-            }));
-            regimes.Add(new Regime("ТУ3", "4.1-1-1-7", 10, new Dictionary<Pipe, double>() {
-                { pipe4_in, 33 },
-                { pipe4_1, 0 },
-                { pipe4_out, 33 }
-            }));
-            regimes.Add(new Regime("ТУ3", "6.11-1-11-1", 10, new Dictionary<Pipe, double>() {
-                { pipe4_in, 41.6 },
-                { pipe4_1, 0 },
-                { pipe4_out, 41.6 }
-            }));
-            regimes.Add(new Regime("ТУ3", "6.11-1-11-1 с отбором", 10, new Dictionary<Pipe, double>() {
-                { pipe4_in, 42.2 },
-                { pipe4_1, 2.2 },
-                { pipe4_out, 40 }
-            }));
-            regimes.Add(new Regime("ТУ3", "8.11-11-11-15", 10, new Dictionary<Pipe, double>() {
-                { pipe4_in, 47.3 },
-                { pipe4_1, 0 },
-                { pipe4_out, 47.3 }
-            }));
-            regimes.Add(new Regime("ТУ3", "8.11-11-11-51 с отбором", 10, new Dictionary<Pipe, double>() {
-                { pipe4_in, 48.5 },
-                { pipe4_1, 2.9 },
-                { pipe4_out, 45.6 }
-            }));
-            // Уровняем сумму вход-выход
-            regimes.ForEach(regime =>
-            {
-                switch (regime.TechnologicalSectionName)
-                {
-                    case "ТУ1":
-                        regime.Q[pipe2_out] = regime[pipe2_in].Value + regime[pipe2_1].Value + regime[pipe2_2].Value;
-                        break;
-                    case "ТУ3":
-                        regime.Q[pipe4_out] = regime[pipe4_in].Value - regime[pipe4_1].Value;
-                        break;
-                }
-            });
+            regimes.Add(new Regime("ТУ3", "10.511-11-511-11 с отбором", 10, new Tuple<double, double[][]>(51.4, new double[][] { new double[] { 0, 2.8 } })));
+            regimes.Add(new Regime("ТУ3", "12.511-511-511-151", 10, new Tuple<double, double[][]>(54.48, new double[][] { new double[] { 0, 0 } })));
+            regimes.Add(new Regime("ТУ3", "2.1-1-0-0", 10, new Tuple<double, double[][]>(18, new double[][] { new double[] { 0, 0 } })));
+            regimes.Add(new Regime("ТУ3", "3.1-1-1-0", 10, new Tuple<double, double[][]>(26.124, new double[][] { new double[] { 0, 0 } })));
+            regimes.Add(new Regime("ТУ3", "4.1-1-1-7", 10, new Tuple<double, double[][]>(33, new double[][] { new double[] { 0, 0 } })));
+            regimes.Add(new Regime("ТУ3", "6.11-1-11-1", 10, new Tuple<double, double[][]>(41.6, new double[][] { new double[] { 0, 0 } })));
+            regimes.Add(new Regime("ТУ3", "6.11-1-11-1 с отбором", 10, new Tuple<double, double[][]>(42.2, new double[][] { new double[] { 0, 2.2 } })));
+            regimes.Add(new Regime("ТУ3", "8.11-11-11-15", 10, new Tuple<double, double[][]>(47.3, new double[][] { new double[] { 0, 0 } })));
+            regimes.Add(new Regime("ТУ3", "8.11-11-11-51 с отбором", 10, new Tuple<double, double[][]>(48.5, new double[][] { new double[] { 0, 2.9 } })));
+            
             // Сделаем значения "в час"
             regimes.ForEach(regime =>
             {
-                foreach (var key in regime.Q.Keys.ToList())
-                {
-                    regime.Q[key] /= 24.0;
-                }
+                regime.G = new Tuple<double, double[][]>(regime.G.Item1 / 24, regime.G.Item2.Select(x => new double[] { x[0] / 24, x[1] / 24 }).ToArray());
             });
 
 
@@ -366,7 +229,7 @@ namespace Pipeline
             return points.FirstOrDefault(x => x.Name == name);
         }
 
-        public Pipe GetPipe(string name)
+        public SubSection GetPipe(string name)
         {
             return pipes.FirstOrDefault(x => x.Name == name);
         }
@@ -376,59 +239,46 @@ namespace Pipeline
             return pipes.Select(p => p.TechnologicalSectionName).Distinct().ToList();
         }
 
-        public List<Pipe> GetTechnologicalSectionPipes(string name)
+        public List<SubSection> GetTechnologicalSectionPipes(string name)
         {
             return pipes.Where(p => p.TechnologicalSectionName == name).ToList();
         }
 
-        public List<double[]> GetTechnologicalSectionMaxFlows(string name)
+        public List<Tuple<double, double[], double>> GetTechnologicalSectionMaxFlows(string name)
         {
             var tsPipes = GetTechnologicalSectionPipes(name);
+            List<Tuple<double, double[], double>> maxFlows = new List<Tuple<double, double[], double>>();
 
             if (pipes.Count() == 0)
-                return new List<double[]>();
+                return maxFlows;
 
-            return AlgorithmHelper.CombineIntoList(pipes.Select(x => x.MaxFlows).ToArray());
-        }
-
-        public List<double[]> GetTechnologicalSectionRegimes(string name)
-        {
-            List<Pipe> tsPipes = GetTechnologicalSectionPipes(name);
-
-            if (tsPipes.Count() == 0)
-                return new List<double[]>();
-
-            List<Regime> tsRegimes = regimes.Where(r => r.TechnologicalSectionName == name).ToList();
-
-            List<double[]> result = new List<double[]>();
-            foreach(var regime in tsRegimes)
+            var tsRepairs = sectionRepairs[name];
+            for (int i = 0; i < Period; i++)
             {
-                result.Add(tsPipes.Select(x => regime[x].Value).ToArray());
+                var pipesMaxFlows = tsPipes.Select(x => x.MaxFlows).ToList();
+                var repair = tsRepairs[i];
+                if (tsPipes.Count() == 1)
+                {
+                    var inputMax = Math.Min(pipesMaxFlows.First(), repair.Item1);
+                    maxFlows.Add(new Tuple<double, double[], double>(inputMax, new double[] { }, inputMax));
+                }
+                else
+                {
+                    var inputMax = Math.Min(pipesMaxFlows.First(), repair.Item1);
+                    var outputMax = Math.Min(pipesMaxFlows.Last(), repair.Item1);
+                    var pumpsMax = pipesMaxFlows.GetRange(1, tsPipes.Count() - 2).Zip(repair.Item2, (x, y) => y < x ? y : x).ToArray();
+                    maxFlows.Add(new Tuple<double, double[], double>(inputMax, pumpsMax, outputMax));
+                }
             }
 
-            return AlgorithmHelper.RemoveDuplicates(result);
+            return maxFlows;
         }
 
-        public List<double[]> GetTechnologicalSectionRegimes(string name, bool[] mask)
+        public List<Regime> GetTechnologicalSectionRegimes(string name)
         {
-            if (mask.All(x => !x)) throw new ArgumentException();
-
-            var tsRegimes = GetTechnologicalSectionRegimes(name);
-
-            if (tsRegimes.Count() == 0)
-                return new List<double[]>();
-
-            return AlgorithmHelper.RemoveDuplicates(AlgorithmHelper.MaskListOfArrays(tsRegimes, mask));
+            return regimes.Where(regime => regime.TechnologicalSectionName == name).ToList();
         }
-
-        public List<List<double[]>> GetStates()
-        {
-            var ts = GetTechnologicalSectionNames();
-            var regimes = ts.Select(x => GetTechnologicalSectionRegimes(x)).Where(x => x.Count() != 0).ToList();
-            var states = AlgorithmHelper.CartesianProduct(regimes).Select(x => x.ToList()).ToList();
-            return states;
-        }
-
+        
         public Dictionary<Reservoir, List<double[]>> GetTankersMasks()
         {
             var tankers = points.Where(x => x.GetType() == typeof(Reservoir)).Select(x => x as Reservoir).ToList();
@@ -487,10 +337,24 @@ namespace Pipeline
             }
 
             var tsNames = GetTechnologicalSectionNames();
-            var tsMathModels = tsNames.Select(tsName => new SectionMathModel(GetTechnologicalSectionRegimes(tsName), ));
+            var tsMathModels = GetTechnologicalSectionNames().Select(name =>
+            {
+                var regimes = GetTechnologicalSectionRegimes(name);
+
+                if (regimes.Count() == 0)
+                    return null;
+
+                var maxFlows = GetTechnologicalSectionMaxFlows(name);
+                var tsPipes = GetTechnologicalSectionPipes(name);
+                List<SubSection> tsPumps = new List<SubSection>();
+                if (tsPipes.Count() > 1)
+                    tsPumps = tsPipes.GetRange(1, tsPipes.Count() - 2);
+                
+                return new SectionMathModel(regimes.Select(regime => regime.G).ToList(), tsPumps.Select(pump => pump.Target == null ? +1.0 : -1.0).ToArray(), maxFlows);
+            }).ToList();
 
 
-            var tsPipes = tsNames.Select(x => GetTechnologicalSectionPipes(x)).ToList();
+            /*var tsPipes = tsNames.Select(x => GetTechnologicalSectionPipes(x)).ToList();
             var tsMaxFlows = tsNames.Select(x => GetTechnologicalSectionMaxFlows(x)).ToList();
 
             var tsSurplusMask = new List<bool[]>
@@ -512,7 +376,7 @@ namespace Pipeline
             maxVol[0] = targets[1][0] * 1.01;
             var schedule = tsMathModels[1].GetOptimalDecomposition(targets[1], minVol, maxVol, Period, new double[] { 1, 2, 1.5 });
 
-            var vol = AlgorithmHelper.GetSumOnInterval(schedule.Select(x => x.Item1.Select(y => y * x.Item2).ToArray()).ToList(), 0, schedule.Count());
+            var vol = AlgorithmHelper.GetSumOnInterval(schedule.Select(x => x.Item1.Select(y => y * x.Item2).ToArray()).ToList(), 0, schedule.Count());*/
         }
 
         #endregion

@@ -122,7 +122,7 @@ namespace IdealPointWPF
                 tu3OutRegimes = new List<LineSeries>();
 
 
-            List<double[]>
+            /*List<double[]>
                 inMaxFlowsList = p.GetTechnologicalSectionMaxFlows("ТУ0"),
                 inRegimesList = p.GetTechnologicalSectionRegimes("ТУ0"),
                 tu1MaxFlowsList = p.GetTechnologicalSectionMaxFlows("ТУ1"),
@@ -328,7 +328,7 @@ namespace IdealPointWPF
                 Color = OxyColors.Green,
                 LineStyle = LineStyle.Dash
             }));
-            tu3OutRegimes.ForEach(x => TU3OutputSchedule.Series.Add(x));
+            tu3OutRegimes.ForEach(x => TU3OutputSchedule.Series.Add(x));*/
 
             Reservoir tank1 = (p.GetPoint("РП1") as Reservoir);
             Tank1 = new PlotModel();
@@ -525,186 +525,6 @@ namespace IdealPointWPF
                  StrokeThickness = 2,
                  LineStyle = LineStyle.Solid
              });
-        }
-
-        public void ShowAlgo()
-        {
-            // Формирование системы
-            SetWinTitle("Формируем систему");
-            PipelineSystem p = new PipelineSystem();
-
-            // Объем, принимаемый от соседнего ОСТ
-            double p1Volume = 1584.27;
-            // Объем, откачки1 на ТУ1
-            double p3Volume = 221.6;
-            // Объем, откачки2 на ТУ1
-            double p4Volume = 9.8;
-            // Объем перекачки в конце ТУ1
-            double p5Volume = 1818;
-            // Объем перекачки в начале ТУ1
-            double p2Volume = p5Volume - p3Volume - p4Volume;
-            // Объем перекачки ТУ2
-            double p6Volume = 1677;
-            // Объем откачки ТУ3
-            double p8Volume = 15;
-            // Объем перекачки в конце ТУ3
-            double p9Volume = 1662;
-            // Объем перекачки в начале ТУ3
-            double p7Volume = p9Volume - p8Volume;
-
-            // объемы РП
-            double 
-                rp1Volume = 47.4,
-                rp2Volume = 114.3,
-                rp3Volume = 47.4;
-
-            // Подкачки к РП
-            double 
-                rp1PumpVolume = 0,
-                rp2PumpVolume = 162.847 - 269,
-                rp3PumpVolume = 0;
-            double[]
-                rp1PumpSchedule = AlgorithmHelper.CreateListOfElements(p.Period, rp1PumpVolume / p.Period).ToArray(),
-                rp2PumpSchedule = AlgorithmHelper.CreateListOfElements(p.Period, rp2PumpVolume / p.Period).ToArray(),
-                rp3PumpSchedule = AlgorithmHelper.CreateListOfElements(p.Period, rp3PumpVolume / p.Period).ToArray();
-
-            // Приурачиваем путевые откачки и подкачки к РП
-            rp1PumpSchedule = rp1PumpSchedule.Select(x => x + p3Volume / p.Period + p4Volume / p.Period).ToArray();
-            rp3PumpSchedule = rp3PumpSchedule.Select(x => x - p8Volume / p.Period).ToArray();
-
-            // Начальные объемы в РП
-            double
-                rp1StartVolume = 3,//12.8,
-                rp2StartVolume = 1,//30.6,
-                rp3StartVolume = 1;//17.7;
-
-            // Проверяем данные
-            //РП1
-            double rp1End = rp1StartVolume + p1Volume + p3Volume + p4Volume - p5Volume + rp1PumpVolume;
-            if (rp1End < 0 || rp1End > rp1Volume)
-            {
-                SetWinTitle("Не соблюден баланс в РП1, решение задачи невозможно");
-                return;
-            }
-            //РП2
-            double rp2End = rp2StartVolume + p5Volume - p6Volume + rp2PumpVolume;
-            if (rp2End < 0 || rp2End > rp2Volume)
-            {
-                SetWinTitle("Не соблюден баланс в РП2, решение задачи невозможно");
-                return;
-            }
-            //РП3
-            double rp3End = rp3StartVolume + p6Volume - p8Volume - p9Volume + rp3PumpVolume;
-            if (rp3End < 0 || rp3End > rp3Volume)
-            {
-                SetWinTitle("Не соблюден баланс в РП3, решение задачи невозможно");
-                return;
-            }
-
-            // Алгоритм для первой трубы
-            var p1MaxFlow = AlgorithmHelper.CreateListOfElements(p.Period, 100.0).ToArray();
-            var p1Regimes = new double[] { p1Volume / p.Period };
-            var p1Algo = new TechnologicalSectionAlgorithm(p1MaxFlow, p1Regimes, 31);
-
-            // Алгоритм для пятой трубы
-            var p5MaxFlow = p.GetTechnologicalSectionMaxFlows("ТУ1").Select(x => x[3]).ToArray();
-            var p5Regimes = p.GetTechnologicalSectionRegimes("ТУ1").Select(x => x[3]).Distinct().ToArray();
-            var p5Algo = new TechnologicalSectionAlgorithm(p5MaxFlow, p5Regimes, 31);
-
-            // Алгоритм для шестой трубы
-            var p6MaxFlow = p.GetTechnologicalSectionMaxFlows("ТУ2").Select(x => x[0]).ToArray();
-            var p6Regimes = p.GetTechnologicalSectionRegimes("ТУ2").Select(x => x[0]).ToArray();
-            var p6Algo = new TechnologicalSectionAlgorithm(p6MaxFlow, p6Regimes, 31);
-
-            // Алгоритм для девятой трубы
-            var p9MaxFlow = p.GetTechnologicalSectionMaxFlows("ТУ3").Select(x => x[2]).ToArray();
-            var p9Regimes = p.GetTechnologicalSectionRegimes("ТУ3").Select(x => x[2]).Distinct().ToArray();
-            var p9Algo = new TechnologicalSectionAlgorithm(p9MaxFlow, p9Regimes, 31);
-
-            // Отсутствие фиксированных расходов
-            double[] noFix = AlgorithmHelper.CreateListOfElements(p.Period, -1.0).ToArray();
-            double[] p1Schedule = AlgorithmHelper.CreateListOfElements(p.Period, p1Volume / p.Period).ToArray();
-
-            // Балансируем РП1
-            SetWinTitle("Баланс РП1.");
-            var rp1BalanceAlgorithm = new ReservoirBalancerAlgorithm(p1Algo, p5Algo, rp1Volume);
-            var rp1Balance = rp1BalanceAlgorithm.Balance(p1Volume, p5Volume, p1Schedule, noFix, rp1StartVolume, rp1PumpSchedule,
-                (string info) => SetWinTitle("Баланс РП1. " + info));
-            if (rp1Balance == null)
-            {
-                SetWinTitle("Не удалось сбалансировать РП1. Решение не найдено.");
-                return;
-            }
-            double[]
-                p2Schedule = rp1Balance[1],
-                p3Schedule = AlgorithmHelper.CreateListOfElements(p.Period, p3Volume / p.Period).ToArray(),
-                p4Schedule = AlgorithmHelper.CreateListOfElements(p.Period, p4Volume / p.Period).ToArray(),
-                p5Schedule = rp1Balance[1];
-
-            // Балансируем РП2
-            SetWinTitle("Баланс РП2.");
-            var rp2BalanceAlgorithm = new ReservoirBalancerAlgorithm(p5Algo, p6Algo, rp2Volume);
-            var rp2Balance = rp2BalanceAlgorithm.Balance(p5Volume, p6Volume, p5Schedule, noFix, rp2StartVolume, rp2PumpSchedule,
-                (string info) => SetWinTitle("Баланс РП2. " + info));
-            if (rp2Balance == null)
-            {
-                SetWinTitle("Не удалось сбалансировать РП2. Решение не найдено.");
-                return;
-            }
-            double[] p6Schedule = rp2Balance[1];
-
-            // Балансируем РП3
-            SetWinTitle("Баланс РП3.");
-            var rp3BalanceAlgorithm = new ReservoirBalancerAlgorithm(p6Algo, p9Algo, rp3Volume);
-            var rp3Balance = rp3BalanceAlgorithm.Balance(p6Volume, p9Volume, p6Schedule, noFix, rp3StartVolume, rp3PumpSchedule,
-                (string info) => SetWinTitle("Баланс РП3. " + info));
-            if (rp3Balance == null)
-            {
-                SetWinTitle("Не удалось сбалансировать РП3. Решение не найдено.");
-                return;
-            }
-            double[] 
-                p7Schedule = rp3Balance[1],
-                p8Schedule = AlgorithmHelper.CreateListOfElements(p.Period, p8Volume / p.Period).ToArray(),
-                p9Schedule = rp3Balance[1];
-
-            //проверка баланса
-            double rp1Cur = rp1StartVolume,
-                rp2Cur = rp2StartVolume,
-                rp3Cur = rp3StartVolume;
-            for (int i = 0; i < p.Period; i++)
-            {
-                rp1Cur += p1Schedule[i] - p2Schedule[i] + rp1PumpSchedule[i];
-                rp2Cur += p5Schedule[i] - p6Schedule[i] + rp2PumpSchedule[i];
-                rp3Cur += p6Schedule[i] - p7Schedule[i] + rp3PumpSchedule[i];
-
-                if (rp1Cur > rp1Volume || rp1Cur < 0)
-                    throw new Exception();
-                if (rp2Cur > rp2Volume || rp2Cur < 0)
-                    throw new Exception();
-                if (rp3Cur > rp3Volume || rp3Cur < 0)
-                    throw new Exception();
-            }
-
-            SetWinTitle("Решение найдено.");
-            GetBasePlots(p);
-            SetPlots(
-                rp1Balance[0], //p1
-                p2Schedule, //p2
-                p3Schedule, //p3
-                p4Schedule, //p4
-                p5Schedule, //p5
-                p6Schedule, //p6
-                p7Schedule, //p7
-                p8Schedule, //p8
-                p9Schedule, //p9
-                rp1StartVolume,
-                rp2StartVolume,
-                rp3StartVolume,
-                rp1PumpSchedule,
-                rp2PumpSchedule,
-                rp3PumpSchedule);
-            UpdateDatacontext();
         }
 
         public void MainAlgo()

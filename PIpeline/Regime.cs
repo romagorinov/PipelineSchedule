@@ -11,7 +11,7 @@ namespace Pipeline
     {
         public class Regime
         {
-            #region Параметры режима
+            #region Свойства
 
             public double W
             {
@@ -19,32 +19,10 @@ namespace Pipeline
                 private set;
             }
 
-            public Dictionary<Pipe, double> Q
+            public Tuple<double, double[][]> G
             {
                 get;
-                private set;
-            }
-
-            public double? this[string pipeName]
-            {
-                get
-                {
-                    if (Q.Any(x => x.Key.Name == pipeName))
-                        return Q.First(x => x.Key.Name == pipeName).Value;
-                    else
-                        return null;
-                }
-            }
-
-            public double? this[Pipe pipe]
-            {
-                get
-                {
-                    if (Q.ContainsKey(pipe))
-                        return Q[pipe];
-                    else
-                        return null;
-                }
+                set;
             }
 
             public string Name
@@ -63,12 +41,12 @@ namespace Pipeline
 
             #region Конструкторы
 
-            public Regime(string tsName, string name, double w, Dictionary<Pipe, double> q)
+            public Regime(string tsName, string name, double w, Tuple<double, double[][]> g)
             {
                 TechnologicalSectionName = tsName;
                 Name = name;
                 W = w;
-                Q = q;
+                G = g;
             }
 
             #endregion

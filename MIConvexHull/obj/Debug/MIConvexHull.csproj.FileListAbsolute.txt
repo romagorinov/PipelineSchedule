@@ -1,9 +1,0 @@
-D:\Загрузки\ConvexHull-master\ConvexHull-master\MIConvexHull\bin\Debug\MIConvexHull.dll
-D:\Загрузки\ConvexHull-master\ConvexHull-master\MIConvexHull\bin\Debug\MIConvexHull.pdb
-D:\Загрузки\ConvexHull-master\ConvexHull-master\MIConvexHull\obj\Debug\MIConvexHull.csprojResolveAssemblyReference.cache
-D:\Загрузки\ConvexHull-master\ConvexHull-master\MIConvexHull\obj\Debug\MIConvexHull.dll
-D:\Загрузки\ConvexHull-master\ConvexHull-master\MIConvexHull\obj\Debug\MIConvexHull.pdb
-D:\Projects\GitHub\PipelineSchedule\MIConvexHull\bin\Debug\MIConvexHull.dll
-D:\Projects\GitHub\PipelineSchedule\MIConvexHull\bin\Debug\MIConvexHull.pdb
-D:\Projects\GitHub\PipelineSchedule\MIConvexHull\obj\Debug\MIConvexHull.dll
-D:\Projects\GitHub\PipelineSchedule\MIConvexHull\obj\Debug\MIConvexHull.pdb
