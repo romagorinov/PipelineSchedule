@@ -83,8 +83,8 @@ namespace Algorithms
         {
             var maxFlows = _maxFlows.GetRange(start, end - start).ToList();
             var avalRegimesOnIntervals = _avalRegimesOnIntervals.GetRange(start, end - start).ToList();
-            List<Tuple<double, double[]>> volumes
-
+            ///List<Tuple<double, double[]>> volumes
+            return null;
         }
 
         #endregion
