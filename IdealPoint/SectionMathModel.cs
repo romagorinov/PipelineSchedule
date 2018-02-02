@@ -11,17 +11,25 @@ namespace Algorithms
     {
         #region Поля
 
-        List<Tuple<double, double[][]>> _regimes;
-        double[] _pumpSigns;
-        List<Tuple<double, double[], double>> _maxFlows;
+        List<RegimeMathModel> _regimes;
+        List<RepairMathModel> _repairs;
         int _period;
-        int _pumpCount;
+        int _pumpsCount;
+        double[] _pumpsSigns;
 
-        List<List<Tuple<double, double[][]>>> _avalRegimesOnIntervals;
+        List<ConvexHull> _convexHulls;
+        List<List<RegimeMathModel>> _avalRegimes;
+        Dictionary<RepairMathModel, List<int>> _sameRepairIntervals;
 
         #endregion
 
         #region Свойства
+
+        public Tuple<double, double[]> NormCoefficients
+        {
+            get;
+            set;
+        }
 
         #endregion
 
@@ -29,44 +37,57 @@ namespace Algorithms
 
         public SectionMathModel(List<Tuple<double, double[][]>> regimes, double[] pumpSigns, List<Tuple<double, double[], double>> maxFlows)
         {
-            _regimes = regimes;
-            _pumpSigns = pumpSigns;
-            _maxFlows = maxFlows;
-            _period = maxFlows.Count();
-            _pumpCount = pumpSigns.Count();
+            // Отыщем нормирующие коэффициенты
+            Helpers.Pair<double, double[]> maxPair = new Helpers.Pair<double, double[]>(double.NegativeInfinity, pumpSigns.Select(x => double.NegativeInfinity).ToArray());
+            for (int i = 0; i < regimes.Count(); i++)
+            {
+                if (regimes[i].Item1 > maxPair.Item1)
+                    maxPair.Item1 = regimes[i].Item1;
 
-            _avalRegimesOnIntervals = new List<List<Tuple<double, double[][]>>>();
+                maxPair.Item2 = maxPair.Item2.Zip(regimes[i].Item2, (x, y) => x > y[1] ? x : y[1]).ToArray();
+            }
+            NormCoefficients = new Tuple<double, double[]>(maxPair.Item1, maxPair.Item2);
+
+            _period = maxFlows.Count();
+            _pumpsCount = pumpSigns.Count();
+            _pumpsSigns = pumpSigns.ToList().ToArray();
+            _regimes = regimes
+                .Select(regime => new RegimeMathModel(
+                    regime.Item1,
+                    regime.Item2.Select(x => x[1]).ToArray(),
+                    regime.Item2.Select(x => x[0]).ToArray(),
+                    pumpSigns))
+                .ToList();
+
+            _convexHulls = new List<ConvexHull>();
+            _avalRegimes = new List<List<RegimeMathModel>>();
+            Dictionary<RepairMathModel, Tuple<ConvexHull, List<RegimeMathModel>>> trace = new Dictionary<RepairMathModel, Tuple<ConvexHull, List<RegimeMathModel>>>();
+            _sameRepairIntervals = new Dictionary<RepairMathModel, List<int>>();
+            _repairs = new List<RepairMathModel>();
             for (int i = 0; i < _period; i++)
             {
-                var avalRegimesOnInterval = new List<Tuple<double, double[][]>>();
-                var maxFlow = _maxFlows[i];
+                var rep = new RepairMathModel(maxFlows[i].Item1, maxFlows[i].Item2, maxFlows[i].Item3);
+                int idx = _repairs.FindIndex(r => r == rep);
+                if (idx != -1)
+                    _repairs.Add(_repairs[idx]);
+                else
+                    _repairs.Add(rep);
 
-                foreach(var regime in _regimes)
+                if (!trace.ContainsKey(_repairs[i]))
                 {
-                    // Проверяем вход ТУ
-                    if (regime.Item1 > maxFlow.Item1)
-                        continue;
-
-                    // Проверяем все подкачки
-                    if (regime.Item2.Zip(maxFlow.Item2, (r, m) => r[0] > m).Any(x => x))
-                        continue;
-
-                    // Првоеряем выход ТУ
-                    if (GetOut(regime.Item1, regime.Item2.Select(x => x[0]).ToArray()) > maxFlow.Item3)
-                        continue;
-
-                    /*var pumpVolumes = regime.Item2.Zip(pumpSigns, (r, s) => r[0] * s).Aggregate(new List<double> { regime.Item1 }, (total,current) =>
-                    {
-                        total.Add(total.Last() + current);
-                        return total;
-                    });
-                    if (pumpVolumes.Any(vol => vol > maxFlow.Item1))
-                        continue;*/
-
-                    avalRegimesOnInterval.Add(regime);    
+                    var avalRegimes = _regimes.Where(regime => regime.CanUse(_repairs[i])).ToList();
+                    var convexHull = GetConvex(avalRegimes, _repairs[i]);
+                    trace.Add(_repairs[i], new Tuple<ConvexHull, List<RegimeMathModel>>(convexHull, avalRegimes));
+                    _convexHulls.Add(convexHull);
+                    _avalRegimes.Add(avalRegimes);
+                    _sameRepairIntervals.Add(_repairs[i], new List<int>() { i });
                 }
-
-                _avalRegimesOnIntervals.Add(avalRegimesOnInterval);
+                else
+                {
+                    _convexHulls.Add(trace[_repairs[i]].Item1);
+                    _avalRegimes.Add(trace[_repairs[i]].Item2);
+                    _sameRepairIntervals[_repairs[i]].Add(i);
+                }
             }
         }
 
@@ -74,17 +95,203 @@ namespace Algorithms
 
         #region Методы
 
-        private double GetOut(double input, double[] pumps)
+        /// <summary>
+        /// Получает выпуклую оболочку из точек режимов
+        /// </summary>
+        /// <param name="regimes">Режимы</param>
+        /// <param name="repair">Ремонтная работа на интервале</param>
+        /// <returns></returns>
+        private static ConvexHull GetConvex(List<RegimeMathModel> regimes, RepairMathModel repair)
         {
-            return pumps.Count() == 0 ? input : pumps.Zip(_pumpSigns, (r, s) => r * s).Sum() + input;
+            var regimeConvex = regimes
+                .Select(regime => regime.GetSystemOfInequalities(repair))
+                .Select(tuple => ConvexHull.CreateFromHPolytope(tuple.Item1, tuple.Item2))
+                .Select((convex,i) => convex.ConvexHullPoints.Select(point => Convert(regimes[i].Gin, point)).ToList())
+                .SelectMany(x => x).ToList();
+            
+            return new ConvexHull(regimeConvex);
+        }
+        
+        public List<double[]> GetContinuousSchedule(double inVolume, double[] pumpsVolume, int start, int end, double[] weights = null)
+        {
+            int period = end - start + 1;
+            var repairs = _repairs.GetRange(start, period).ToList();
+            var convexHulls = _convexHulls.GetRange(start, period).ToList();
+            var sameRepairsIntervals = _sameRepairIntervals.ToDictionary(kv => kv.Key, kv => kv.Value.Where(x => x >= start && x <= end).Select(x => x - start).ToList()).Where(x => x.Value.Count() > 0).ToDictionary(kv => kv.Key, kv => kv.Value);
+
+            if (weights == null)
+                weights = AlgorithmHelper.CreateListOfElements(_pumpsCount + 1, 1.0).ToArray();
+
+            // Получим средний расход на весь период
+            var schedule = new List<double[]>(period);
+            double avgInVol = inVolume / period;
+            double[] avgPumpsVol = pumpsVolume.Select(x => x / period).ToArray();
+            double[] avgPoint = Convert(avgInVol, avgPumpsVol);
+            for (int i = 0; i < period; i++)
+            {
+                schedule.Add(avgPoint.ToList().ToArray());
+            }
+
+            Dictionary<RepairMathModel, bool> isIntervalCorrected = sameRepairsIntervals.ToDictionary(kv => kv.Key, kv => false);
+            int uncorrectedPeriod = period;
+            while (true)
+            {
+                double[] sumCorrectedVolume = new double[_pumpsCount + 1];
+                foreach(var kv in sameRepairsIntervals)
+                {
+                    int intervalLength = kv.Value.Count();
+                    int intervalIdx = kv.Value[0];
+                    var currentPoint = schedule[intervalIdx];
+                    if (!isIntervalCorrected[kv.Key] && !convexHulls[intervalIdx].IsPointInConvexHull(currentPoint))
+                    {
+                        var nearestPoint = convexHulls[intervalIdx].FindNearestInteriorPoint(currentPoint, true, weights);
+                        var correctedVolume = currentPoint.Subtract(nearestPoint);
+                        kv.Value.ForEach(x => schedule[x] = nearestPoint);
+                        sumCorrectedVolume = sumCorrectedVolume.Add(correctedVolume.Multiply(intervalLength));
+                        uncorrectedPeriod -= intervalLength;
+                        isIntervalCorrected[kv.Key] = true;
+                    }
+                }
+
+                if (sumCorrectedVolume.All(x => x == 0.0))
+                    break;
+
+                double[] avgCorrectedVolume = sumCorrectedVolume.Select(x => x / uncorrectedPeriod).ToArray();
+
+                foreach (var kv in sameRepairsIntervals)
+                {
+                    if (!isIntervalCorrected[kv.Key])
+                        kv.Value.ForEach(x => schedule[x] = schedule[x].Add(avgCorrectedVolume));
+                }
+            }
+
+            return schedule;
         }
 
-        public List<Tuple<double, double[]>> DecomposeVolume(Tuple<double, double[]> volume, int start, int end)
+        public List<Tuple<double, double[]>> GetRegimesDecomposition(double inVolume, double[] pumpsVolume, int start, int end, double[] weights = null)
         {
-            var maxFlows = _maxFlows.GetRange(start, end - start).ToList();
-            var avalRegimesOnIntervals = _avalRegimesOnIntervals.GetRange(start, end - start).ToList();
-            ///List<Tuple<double, double[]>> volumes
-            return null;
+            if (weights == null)
+                weights = AlgorithmHelper.CreateListOfElements(_pumpsCount + 1, 1.0).ToArray();
+
+            var normWeights = GetNormWeights(weights);
+
+            var normQuadraticWeights = weights;//GetNormQuadraticWeights(weights);
+
+            double[] pumpsQuadraticWeights = weights;// normQuadraticWeights.ToList().GetRange(1, _pumpsCount).ToArray();
+
+            int period = end - start + 1;
+            var repairs = _repairs.GetRange(start, period).ToList();
+            var avalRegimesOnIntervals = _avalRegimes.GetRange(start, period).ToList();
+            var convexHulls = _convexHulls.GetRange(start, period).ToList();
+
+            var avaliableContinuousSchedule = GetContinuousSchedule(inVolume, pumpsVolume, start, end, weights);
+            var avaliableSum = Convert(AlgorithmHelper.GetSumOnInterval(avaliableContinuousSchedule, 0, avaliableContinuousSchedule.Count()));
+            inVolume = avaliableSum.Item1;
+            pumpsVolume = avaliableSum.Item2;            
+
+            List<Tuple<double, double[]>> schedule = new List<Tuple<double, double[]>>();
+
+            double leftoverInVolume = inVolume;
+            double[] leftoverPumpsVolume = pumpsVolume;
+            for (int i = 0; i < period; i++)
+            {
+                var repair = repairs[i];
+
+                var avalRegimes = avalRegimesOnIntervals[i].Where(regime => !leftoverPumpsVolume.Zip(regime.GpumpMin, (x, y) => x == 0 && y > 0).Any(x => x) && !(leftoverInVolume == 0 && regime.Gin > 0)).ToList();
+                if (avalRegimes.Count() == 0)
+                    throw new Exception();
+
+                var avalNonZeroRegimes = avalRegimes.Where(regime => !leftoverPumpsVolume.Zip(regime.GpumpMax, (x, y) => x > 0 && y == 0).Any(x => x) && !(leftoverInVolume > 0 && regime.Gin == 0)).ToList();
+                if (avalNonZeroRegimes.Count() > 0)
+                    avalRegimes = avalNonZeroRegimes;
+
+                List<double[]> continuousSchedule = GetContinuousSchedule(leftoverInVolume, leftoverPumpsVolume, start + i, end, normQuadraticWeights);
+                double currentInVolume = continuousSchedule[0][0];
+                double[] currentPumpsVolume = continuousSchedule[0].ToList().GetRange(1, _pumpsCount).ToArray();
+
+                Tuple<double, double[]> selectedRegime;
+
+                // Выбираем режим, ближайший по дистанции
+                var regimeBestStates = avalRegimes.Select(regime =>
+                {
+                    double[] pumpVol;
+                    if (regime.CanPump(currentPumpsVolume, repair))
+                        pumpVol = currentPumpsVolume;
+                    else
+                        pumpVol = regime.GetNearestPumpsPoit(currentPumpsVolume, repair, pumpsQuadraticWeights);
+                    
+                    return Convert(regime.Gin, pumpVol);
+                }).ToList();
+                var distances = regimeBestStates.Select(x => x.Multiply(normWeights)).ToList();
+                int selectedIdx = AlgorithmHelper.NearestByDistance(
+                    regimeBestStates.Select(x => x.Multiply(normWeights)).ToList(),
+                    Convert(currentInVolume, currentPumpsVolume).Multiply(normWeights));
+                selectedRegime = Convert(regimeBestStates[selectedIdx]);
+
+
+                schedule.Add(selectedRegime);
+
+                leftoverInVolume -= selectedRegime.Item1;
+                if (leftoverInVolume < 0.0)
+                    leftoverInVolume = 0.0;
+
+                leftoverPumpsVolume = leftoverPumpsVolume.Subtract(selectedRegime.Item2);
+                leftoverPumpsVolume = leftoverPumpsVolume.Select(x => x < 0.0 ? 0.0 : x).ToArray();
+            }
+
+            return schedule;
+        }
+
+        public double[] GetNormWeights(double[] weights)
+        {
+            double[] result = weights.Select(x => x).ToArray();
+            result[0] /= NormCoefficients.Item1;
+            for (int i = 1; i < _pumpsCount + 1; i++)
+            {
+                result[i] /= NormCoefficients.Item2[i - 1];
+            }
+            return result;
+        }
+
+        public double[] GetNormQuadraticWeights(double[] weights)
+        {
+            double[] result = weights.Select(x => Math.Sqrt(x)).ToArray();
+            result[0] /= NormCoefficients.Item1;
+            for (int i = 1; i < _pumpsCount + 1; i++)
+            {
+                result[i] /= NormCoefficients.Item2[i - 1];
+            }
+            return result;
+        }
+
+        public List<double[]> AddOutputElement(List<double[]> schedule)
+        {
+            var result = new List<double[]>();
+            for (int i = 0; i < schedule.Count(); i++)
+            {
+                var list = schedule[i].ToList();
+                list.Add(list.GetRange(1, list.Count() - 1).Zip(_pumpsSigns, (x, y) => x * y).Sum() + list[0]);
+                result.Add(list.ToArray());
+            }
+            return result;
+        }
+
+        public static double[] Convert(double val, double[] vals)
+        {
+            double[] result = new double[vals.Length + 1];
+            result[0] = val;
+            Array.Copy(vals, 0, result, 1, vals.Length);
+            return result;
+        }
+
+        public static double[] Convert(Tuple<double, double[]> val)
+        {
+            return Convert(val.Item1, val.Item2);
+        }
+
+        public static Tuple<double, double[]> Convert(double[] val)
+        {
+            return new Tuple<double, double[]>(val[0], val.ToList().GetRange(1, val.Count() - 1).ToArray());
         }
 
         #endregion

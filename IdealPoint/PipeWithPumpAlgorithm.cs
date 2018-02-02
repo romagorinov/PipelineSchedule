@@ -228,7 +228,7 @@ namespace Algorithms
                 double[] targetRegime =  FormScheduleContinuousRegimeField(targets, notSortedSchedule, idx)[0].Zip(_maxFlows, (x,y) => x / y).ToArray();
 
                 // Ищем ближайший к нему режим среди доступных
-                double[] bestRegime = AlgorithmHelper.NearestByDistance(currentAvaliableRegimes, targetRegime);
+                double[] bestRegime = currentAvaliableRegimes[AlgorithmHelper.NearestByDistance(currentAvaliableRegimes, targetRegime)];
 
                 notSortedSchedule[idx] = _regimes[_normRegimes.IndexOf(bestRegime)];
 

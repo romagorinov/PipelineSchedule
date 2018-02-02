@@ -55,12 +55,6 @@ namespace IdealPointWPF
         private void GetBasePlots(PipelineSystem p)
         {
             LineSeries
-                inMaxFlows = new LineSeries()
-                {
-                    Color = OxyColors.Red,
-                    StrokeThickness = 2,
-                    LineStyle = LineStyle.LongDash
-                },
                 tu1InMaxFlows = new LineSeries()
                 {
                     Color = OxyColors.Red,
@@ -108,227 +102,122 @@ namespace IdealPointWPF
                     Color = OxyColors.Red,
                     StrokeThickness = 2,
                     LineStyle = LineStyle.LongDash
+                },
+                zeros = new LineSeries()
+                {
+                    Color = OxyColors.Red,
+                    StrokeThickness = 2,
+                    LineStyle = LineStyle.LongDash
                 };
 
-            List<LineSeries>
-                inRegimes = new List <LineSeries>(),
-                tu1InRegimes = new List<LineSeries>(),
-                tu1Pump1Regimes = new List<LineSeries>(),
-                tu1Pump2Regimes = new List<LineSeries>(),
-                tu1OutRegimes = new List<LineSeries>(),
-                tu2Regimes = new List<LineSeries>(),
-                tu3InRegimes = new List<LineSeries>(),
-                tu3PumpRegimes = new List<LineSeries>(),
-                tu3OutRegimes = new List<LineSeries>();
+            Func<LineSeries, LineSeries> CopySerie = (source) =>
+            {
+                return new LineSeries()
+                {
+                    ItemsSource = source.ItemsSource as List<DataPoint>,
+                    StrokeThickness = source.StrokeThickness,
+                    Color = source.Color,
+                    LineStyle = source.LineStyle
+                };
+            };
 
-
-            /*List<double[]>
-                inMaxFlowsList = p.GetTechnologicalSectionMaxFlows("ТУ0"),
-                inRegimesList = p.GetTechnologicalSectionRegimes("ТУ0"),
-                tu1MaxFlowsList = p.GetTechnologicalSectionMaxFlows("ТУ1"),
-                tu1RegimesList = p.GetTechnologicalSectionRegimes("ТУ1"),
-                tu2MaxFlowsList = p.GetTechnologicalSectionMaxFlows("ТУ2"),
-                tu2RegimesList = p.GetTechnologicalSectionRegimes("ТУ2"),
-                tu3MaxFlowsList = p.GetTechnologicalSectionMaxFlows("ТУ3"),
-                tu3RegimesList = p.GetTechnologicalSectionRegimes("ТУ3");
-
-            InSchedule = new PlotModel();
-            double[] inRegimesMax = AlgorithmHelper.GetMaxInListByComponents(inRegimesList);
-            inMaxFlows.ItemsSource = inMaxFlowsList.Aggregate(new List<DataPoint>(), (total, current) =>
+            List<double[]>
+                tu1MaxFlowsList = p.GetTechnologicalSectionInputOutputMax("ТУ1"),
+                tu2MaxFlowsList = p.GetTechnologicalSectionInputOutputMax("ТУ2"),
+                tu3MaxFlowsList = p.GetTechnologicalSectionInputOutputMax("ТУ3");
+            
+            zeros.ItemsSource = tu1MaxFlowsList.Aggregate(new List<DataPoint>(), (total, current) =>
             {
                 int i = total.Count() / 2;
-                total.Add(new DataPoint(i + 0.001, Math.Min(inRegimesMax[0], current[0])));
-                total.Add(new DataPoint(i + 1, Math.Min(inRegimesMax[0], current[0])));
+                total.Add(new DataPoint(i + 0.001, 0));
+                total.Add(new DataPoint(i + 1, 0));
                 return total;
             });
-            InSchedule.Series.Add(inMaxFlows);
-            inRegimesList.ForEach(x => inRegimes.Add(new LineSeries()
-            {
-                ItemsSource = new List<DataPoint>()
-                {
-                    new DataPoint(0, x[0]),
-                    new DataPoint(p.Period, x[0])
-                },
-                StrokeThickness = 0.5,
-                Color = OxyColors.Green,
-                LineStyle = LineStyle.Dash
-            }));
-            inRegimes.ForEach(x => InSchedule.Series.Add(x));
 
+            InSchedule = new PlotModel();
             TU1InputSchedule = new PlotModel();
             TU1Pump1Schedule = new PlotModel();
             TU1Pump2Schedule = new PlotModel();
             TU1OutputSchedule = new PlotModel();
-            double[] tu1RegimesMax = AlgorithmHelper.GetMaxInListByComponents(tu1RegimesList);
             tu1InMaxFlows.ItemsSource = tu1MaxFlowsList.Aggregate(new List<DataPoint>(), (total, current) =>
             {
                 int i = total.Count() / 2;
-                total.Add(new DataPoint(i + 0.001, Math.Min(tu1RegimesMax[0], current[0])));
-                total.Add(new DataPoint(i + 1, Math.Min(tu1RegimesMax[0], current[0])));
+                total.Add(new DataPoint(i + 0.001, current[0]));
+                total.Add(new DataPoint(i + 1, current[0]));
                 return total;
             });
             tu1Pump1MaxFlows.ItemsSource = tu1MaxFlowsList.Aggregate(new List<DataPoint>(), (total, current) =>
             {
                 int i = total.Count() / 2;
-                total.Add(new DataPoint(i + 0.001, Math.Min(tu1RegimesMax[1], current[1])));
-                total.Add(new DataPoint(i + 1, Math.Min(tu1RegimesMax[1], current[1])));
+                total.Add(new DataPoint(i + 0.001, current[1]));
+                total.Add(new DataPoint(i + 1, current[1]));
                 return total;
             });
             tu1Pump2MaxFlows.ItemsSource = tu1MaxFlowsList.Aggregate(new List<DataPoint>(), (total, current) =>
             {
                 int i = total.Count() / 2;
-                total.Add(new DataPoint(i + 0.001, Math.Min(tu1RegimesMax[2], current[2])));
-                total.Add(new DataPoint(i + 1, Math.Min(tu1RegimesMax[2], current[2])));
+                total.Add(new DataPoint(i + 0.001, current[2]));
+                total.Add(new DataPoint(i + 1, current[2]));
                 return total;
             });
             tu1OutMaxFlows.ItemsSource = tu1MaxFlowsList.Aggregate(new List<DataPoint>(), (total, current) =>
             {
                 int i = total.Count() / 2;
-                total.Add(new DataPoint(i + 0.001, Math.Min(tu1RegimesMax[3], current[3])));
-                total.Add(new DataPoint(i + 1, Math.Min(tu1RegimesMax[3], current[3])));
+                total.Add(new DataPoint(i + 0.001, current[3]));
+                total.Add(new DataPoint(i + 1, current[3]));
                 return total;
             });
             TU1InputSchedule.Series.Add(tu1InMaxFlows);
             TU1Pump1Schedule.Series.Add(tu1Pump1MaxFlows);
             TU1Pump2Schedule.Series.Add(tu1Pump2MaxFlows);
             TU1OutputSchedule.Series.Add(tu1OutMaxFlows);
-            tu1RegimesList.ForEach(x => tu1InRegimes.Add(new LineSeries()
-            {
-                ItemsSource = new List<DataPoint>()
-                {
-                    new DataPoint(0, x[0]),
-                    new DataPoint(p.Period, x[0])
-                },
-                StrokeThickness = 0.5,
-                Color = OxyColors.Green,
-                LineStyle = LineStyle.Dash
-            }));
-            tu1InRegimes.ForEach(x => TU1InputSchedule.Series.Add(x));
-            tu1RegimesList.ForEach(x => tu1Pump1Regimes.Add(new LineSeries()
-            {
-                ItemsSource = new List<DataPoint>()
-                {
-                    new DataPoint(0, x[1]),
-                    new DataPoint(p.Period, x[1])
-                },
-                StrokeThickness = 0.5,
-                Color = OxyColors.Green,
-                LineStyle = LineStyle.Dash
-            }));
-            tu1Pump1Regimes.ForEach(x => TU1Pump1Schedule.Series.Add(x));
-            tu1RegimesList.ForEach(x => tu1Pump2Regimes.Add(new LineSeries()
-            {
-                ItemsSource = new List<DataPoint>()
-                {
-                    new DataPoint(0, x[2]),
-                    new DataPoint(p.Period, x[2])
-                },
-                StrokeThickness = 0.5,
-                Color = OxyColors.Green,
-                LineStyle = LineStyle.Dash
-            }));
-            tu1Pump2Regimes.ForEach(x => TU1Pump2Schedule.Series.Add(x));
-            tu1RegimesList.ForEach(x => tu1OutRegimes.Add(new LineSeries()
-            {
-                ItemsSource = new List<DataPoint>()
-                {
-                    new DataPoint(0, x[3]),
-                    new DataPoint(p.Period, x[3])
-                },
-                StrokeThickness = 0.5,
-                Color = OxyColors.Green,
-                LineStyle = LineStyle.Dash
-            }));
-            tu1OutRegimes.ForEach(x => TU1OutputSchedule.Series.Add(x));
-            
+            TU1InputSchedule.Series.Add(CopySerie(zeros));
+            TU1Pump1Schedule.Series.Add(CopySerie(zeros));
+            TU1Pump2Schedule.Series.Add(CopySerie(zeros));
+            TU1OutputSchedule.Series.Add(CopySerie(zeros));
+
             TU2Schedule = new PlotModel();
-            double[] tu2RegimesMax = AlgorithmHelper.GetMaxInListByComponents(tu2RegimesList);
             tu2MaxFlows.ItemsSource = tu2MaxFlowsList.Aggregate(new List<DataPoint>(), (total, current) =>
             {
                 int i = total.Count() / 2;
-                total.Add(new DataPoint(i + 0.001, Math.Min(tu2RegimesMax[0], current[0])));
-                total.Add(new DataPoint(i + 1, Math.Min(tu2RegimesMax[0], current[0])));
+                total.Add(new DataPoint(i + 0.001, current[0]));
+                total.Add(new DataPoint(i + 1, current[0]));
                 return total;
             });
             TU2Schedule.Series.Add(tu2MaxFlows);
-            tu2RegimesList.ForEach(x => tu2Regimes.Add(new LineSeries()
-            {
-                ItemsSource = new List<DataPoint>()
-                {
-                    new DataPoint(0, x[0]),
-                    new DataPoint(p.Period, x[0])
-                },
-                StrokeThickness = 0.5,
-                Color = OxyColors.Green,
-                LineStyle = LineStyle.Dash
-            }));
-            tu2Regimes.ForEach(x => TU2Schedule.Series.Add(x));
+            TU2Schedule.Series.Add(CopySerie(zeros));
 
 
             TU3InputSchedule = new PlotModel();
             TU3PumpSchedule = new PlotModel();
             TU3OutputSchedule = new PlotModel();
-            double[] tu3RegimesMax = AlgorithmHelper.GetMaxInListByComponents(tu3RegimesList);
             tu3InMaxFlows.ItemsSource = tu3MaxFlowsList.Aggregate(new List<DataPoint>(), (total, current) =>
             {
                 int i = total.Count() / 2;
-                total.Add(new DataPoint(i + 0.001, Math.Min(tu3RegimesMax[0], current[0])));
-                total.Add(new DataPoint(i + 1, Math.Min(tu3RegimesMax[0], current[0])));
+                total.Add(new DataPoint(i + 0.001, current[0]));
+                total.Add(new DataPoint(i + 1, current[0]));
                 return total;
             });
             tu3PumpMaxFlows.ItemsSource = tu3MaxFlowsList.Aggregate(new List<DataPoint>(), (total, current) =>
             {
                 int i = total.Count() / 2;
-                total.Add(new DataPoint(i + 0.001, Math.Min(tu3RegimesMax[1], current[1])));
-                total.Add(new DataPoint(i + 1, Math.Min(tu3RegimesMax[1], current[1])));
+                total.Add(new DataPoint(i + 0.001, current[1]));
+                total.Add(new DataPoint(i + 1, current[1]));
                 return total;
             });
             tu3OutMaxFlows.ItemsSource = tu3MaxFlowsList.Aggregate(new List<DataPoint>(), (total, current) =>
             {
                 int i = total.Count() / 2;
-                total.Add(new DataPoint(i + 0.001, Math.Min(tu3RegimesMax[2], current[2])));
-                total.Add(new DataPoint(i + 1, Math.Min(tu3RegimesMax[2], current[2])));
+                total.Add(new DataPoint(i + 0.001, current[2]));
+                total.Add(new DataPoint(i + 1, current[2]));
                 return total;
             });
             TU3InputSchedule.Series.Add(tu3InMaxFlows);
             TU3PumpSchedule.Series.Add(tu3PumpMaxFlows);
             TU3OutputSchedule.Series.Add(tu3OutMaxFlows);
-            tu3RegimesList.ForEach(x => tu3InRegimes.Add(new LineSeries()
-            {
-                ItemsSource = new List<DataPoint>()
-                {
-                    new DataPoint(0, x[0]),
-                    new DataPoint(p.Period, x[0])
-                },
-                StrokeThickness = 0.5,
-                Color = OxyColors.Green,
-                LineStyle = LineStyle.Dash
-            }));
-            tu3InRegimes.ForEach(x => TU3InputSchedule.Series.Add(x));
-            tu3RegimesList.ForEach(x => tu3PumpRegimes.Add(new LineSeries()
-            {
-                ItemsSource = new List<DataPoint>()
-                {
-                    new DataPoint(0, x[1]),
-                    new DataPoint(p.Period, x[1])
-                },
-                StrokeThickness = 0.5,
-                Color = OxyColors.Green,
-                LineStyle = LineStyle.Dash
-            }));
-            tu3PumpRegimes.ForEach(x => TU3PumpSchedule.Series.Add(x));
-            tu3RegimesList.ForEach(x => tu3OutRegimes.Add(new LineSeries()
-            {
-                ItemsSource = new List<DataPoint>()
-                {
-                    new DataPoint(0, x[2]),
-                    new DataPoint(p.Period, x[2])
-                },
-                StrokeThickness = 0.5,
-                Color = OxyColors.Green,
-                LineStyle = LineStyle.Dash
-            }));
-            tu3OutRegimes.ForEach(x => TU3OutputSchedule.Series.Add(x));*/
+            TU3InputSchedule.Series.Add(CopySerie(zeros));
+            TU3PumpSchedule.Series.Add(CopySerie(zeros));
+            TU3OutputSchedule.Series.Add(CopySerie(zeros));
 
             Reservoir tank1 = (p.GetPoint("РП1") as Reservoir);
             Tank1 = new PlotModel();
@@ -402,6 +291,8 @@ namespace IdealPointWPF
                 StrokeThickness = 2,
                 LineStyle = LineStyle.LongDash
             });
+
+            UpdateDatacontext();
         }
 
         private List<DataPoint> ConvertToDatapoints(double[] arr)
@@ -525,13 +416,34 @@ namespace IdealPointWPF
                  StrokeThickness = 2,
                  LineStyle = LineStyle.Solid
              });
+
+            UpdateDatacontext();
         }
 
         public void MainAlgo()
         {
             PipelineSystem p = new PipelineSystem();
+            GetBasePlots(p);
+            List<double[]> tu1 = p.Algorithm();
 
-            p.Algorithm();
+            double[] zeros = new double[p.Period];
+
+            SetPlots(
+                zeros,
+                tu1.Select(x => x[0]).ToArray(),
+                tu1.Select(x => x[1]).ToArray(),
+                tu1.Select(x => x[2]).ToArray(),
+                tu1.Select(x => x[3]).ToArray(),
+                zeros,
+                zeros,
+                zeros,
+                zeros,
+                0,
+                0,
+                0,
+                zeros,
+                zeros,
+                zeros);
             
         }
 

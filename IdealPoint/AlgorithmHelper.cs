@@ -6,6 +6,8 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Accord.Math;
+using Accord.Math.Optimization;
 
 namespace Algorithms
 {
@@ -27,7 +29,7 @@ namespace Algorithms
             }
         }
 
-        public static double NearestByModul(List<double> arr, double val)
+        public static int NearestByModul(List<double> arr, double val)
         {
             #if (CHECKER)
             if (arr == null || arr.Count() == 0) throw new ArgumentException();
@@ -46,10 +48,10 @@ namespace Algorithms
                 }
             }
 
-            return arr[idx];
+            return idx;
         }
 
-        public static double[] NearestByDistance(List<double[]> arr, double[] val)
+        public static int NearestByDistance(List<double[]> arr, double[] val)
         {
 #if (CHECKER)
             if (arr == null || arr.Count() == 0 || val == null) throw new ArgumentNullException();
@@ -70,10 +72,10 @@ namespace Algorithms
                 }
             }
 
-            return arr[idx];
+            return idx;
         }
         
-        public static double? NearestWithUpperBound(List<double> arr, double val, double upperBound)
+        public static int? NearestWithUpperBound(List<double> arr, double val, double upperBound)
         {
 #if (CHECKER)
             if (arr == null || arr.Count() == 0) throw new ArgumentException();
@@ -87,7 +89,7 @@ namespace Algorithms
             return NearestByModul(arr, val);
         }
 
-        public static double? NearestWithLowerBound(List<double> arr, double val, double lowerBound)
+        public static int? NearestWithLowerBound(List<double> arr, double val, double lowerBound)
         {
 #if (CHECKER)
             if (arr == null || arr.Count() == 0) throw new ArgumentException();
@@ -474,18 +476,19 @@ namespace Algorithms
             return String.Join(System.Environment.NewLine, toStrings);
         }
 
-
-        public static T[][] ToJuggedArray<T>(T[,] matrix)
+        public static double[] SolveQP(double[,] Q, double[] d, double[,] A, double[] b, int eq)
         {
-            int rows = matrix.GetLength(0), cols = matrix.GetLength(1);
-            T[][] result = new T[rows][];
-            for (int i = 0; i < rows; i++)
-            {
-                result[i] = new T[cols];
-                for (int j = 0; j < cols; j++)
-                    result[i][j] = matrix[i, j];
-            }
-            return result;
+            var solver = new GoldfarbIdnani(new QuadraticObjectiveFunction(Q, d), A, b, eq);
+            solver.Minimize();
+            if (solver.Status == GoldfarbIdnaniStatus.Success)
+                return solver.Solution.Select(x => x < 0.0 ? 0.0 : x).ToArray();
+            else
+                return null;
+        }
+
+        public static double[] SolveQP(double[][] Q, double[] d, double[][] A, double[] b, int eq)
+        {
+            return SolveQP(Q.ToMatrix(), d, A.ToMatrix(), b, eq);
         }
     }
 }

@@ -56,16 +56,16 @@ namespace Pipeline
                 output2 = new IOObject("ж/д Светлый");
 
             SubSection pipe1 = new SubSection("ТУ0", mainInput, rp1, "ТУ0", 51.1 / 24),
-                pipe2_in = new SubSection("ТУ1 вход", rp1, null, "ТУ1"),
-                pipe2_1 = new SubSection("ТУ1 подкачка 1", input1, null, "ТУ1"),
-                pipe2_2 = new SubSection("ТУ1 подкачка 2", input2, null, "ТУ1"),
-                pipe2_out = new SubSection("ТУ1 выход", null, rp2, "ТУ1", 69.3 / 24),
+                pipe2_in = new SubSection("ТУ1 вход", rp1, null, "ТУ1", 69.5 / 24),
+                pipe2_1 = new SubSection("ТУ1 подкачка 1", input1, null, "ТУ1", 250.0 / (31 * 24)),
+                pipe2_2 = new SubSection("ТУ1 подкачка 2", input2, null, "ТУ1", 50.0 / (31 * 24)),
+                pipe2_out = new SubSection("ТУ1 выход", null, rp2, "ТУ1", 69.5 / 24),
                 pipe3 = new SubSection("ТУ2", rp2, rp3, "ТУ2", 64.3 / 24),
-                pipe4_in = new SubSection("ТУ3 вход", rp3, null, "ТУ3"),
-                pipe4_1 = new SubSection("ТУ3 откачка ж/д Светлый", null, output2, "ТУ3"),
+                pipe4_in = new SubSection("ТУ3 вход", rp3, null, "ТУ3", 56.4 / 24),
+                pipe4_1 = new SubSection("ТУ3 откачка ж/д Светлый", null, output2, "ТУ3", 10.8 / 24),
                 pipe4_out = new SubSection("ТУ3 вход", null, mainInput, "ТУ3", 54.5 / 24),
                 pipe5 = new SubSection("Труба откачка У НПЗ", rp2, output1, "Труба откачка У НПЗ", 21.6 / 24),
-                pipe6 = new SubSection("Труба подкачка ГНПС 2", input3, rp2, "Труба подкачка ГНПС 2");
+                pipe6 = new SubSection("Труба подкачка ГНПС 2", input3, rp2, "Труба подкачка ГНПС 2", 9.72 / 24);
 
             points = new List<NamedObject>() { rp1, rp2, rp3, mainInput, mainOutput, input1, input2, input3, output1, output2 };
             pipes = new List<SubSection>() { pipe1, pipe2_in, pipe2_1, pipe2_2, pipe2_out, pipe3, pipe4_in, pipe4_1, pipe4_out, pipe5, pipe6 };
@@ -76,6 +76,7 @@ namespace Pipeline
             DiscreteSchedule tu1MainRepairs = new DiscreteSchedule(Period, bigMaxflowValue);
             tu1MainRepairs.FillInterval(61.5 / 24, 10 * 24 + 12, 10 * 24 + 13);
             tu1MainRepairs.FillInterval(46.1 / 24, 11 * 24 + 12, 11 * 24 + 16);
+            //tu1MainRepairs.FillInterval(0, 11 * 24 + 12, 11 * 24 + 24);
             tu1MainRepairs.FillInterval(61.5 / 24, 12 * 24 + 12, 12 * 24 + 14);
             tu1MainRepairs.FillInterval(53.5 / 24, 17 * 24 + 12, 17 * 24 + 16);
             tu1MainRepairs.FillInterval(46.1 / 24, 18 * 24 + 12, 18 * 24 + 14);
@@ -115,6 +116,7 @@ namespace Pipeline
             // Режимы
             /////////////////////
             // Первый ТУ
+            regimes.Add(new Regime("ТУ1", "0", 10, new Tuple<double, double[][]>(0, new double[][] { new double[] { 0, 0 }, new double[] { 0, 0 } })));
             regimes.Add(new Regime("ТУ1", "1.2-0-0-0-0-0", 10, new Tuple<double, double[][]>(14.4, new double[][] { new double[] { 0, 6.552 }, new double[] {0, 0.696 }})));
             regimes.Add(new Regime("ТУ1", "10.22-22-2-22-22-2", 10, new Tuple<double, double[][]>(51.84, new double[][] { new double[] { 0, 6.66 }, new double[] { 0, 0.516 } })));
             regimes.Add(new Regime("ТУ1", "12.22-22-22-22-22-12", 10, new Tuple<double, double[][]>(55.2, new double[][] { new double[] { 0, 5.292 }, new double[] { 0, 1.032 } })));
@@ -130,6 +132,7 @@ namespace Pipeline
             regimes.Add(new Regime("ТУ1", "8.22-2-2-22-2-2", 10, new Tuple<double, double[][]>(46.62, new double[][] { new double[] { 0, 6.168 }, new double[] { 0, 0.684 } })));
 
             // Второй ТУ
+            regimes.Add(new Regime("ТУ2", "0", 10, new Tuple<double, double[][]>(0, new double[][] { })));
             regimes.Add(new Regime("ТУ2", "1.1-0-0-0", 10, new Tuple<double, double[][]>(14.76, new double[][] { })));
             regimes.Add(new Regime("ТУ2", "10.33-11-511-511", 10, new Tuple<double, double[][]>(62.904, new double[][] { })));
             regimes.Add(new Regime("ТУ2", "2.3-1-0-0", 10, new Tuple<double, double[][]>(24, new double[][] { })));
@@ -141,6 +144,7 @@ namespace Pipeline
             regimes.Add(new Regime("ТУ2", "8.31-51-11-51", 10, new Tuple<double, double[][]>(54.1, new double[][] { })));
 
             // Третий ТУ
+            regimes.Add(new Regime("ТУ3", "0", 10, new Tuple<double, double[][]>(0, new double[][] { new double[] { 0, 0 } })));
             regimes.Add(new Regime("ТУ3", "10.511-11-511-11 с отбором", 10, new Tuple<double, double[][]>(51.4, new double[][] { new double[] { 0, 2.8 } })));
             regimes.Add(new Regime("ТУ3", "12.511-511-511-151", 10, new Tuple<double, double[][]>(54.48, new double[][] { new double[] { 0, 0 } })));
             regimes.Add(new Regime("ТУ3", "2.1-1-0-0", 10, new Tuple<double, double[][]>(18, new double[][] { new double[] { 0, 0 } })));
@@ -154,7 +158,10 @@ namespace Pipeline
             // Сделаем значения "в час"
             regimes.ForEach(regime =>
             {
-                regime.G = new Tuple<double, double[][]>(regime.G.Item1 / 24, regime.G.Item2.Select(x => new double[] { x[0] / 24, x[1] / 24 }).ToArray());
+                regime.G = new Tuple<double, double[][]>(regime.G.Item1 / 24, regime.G.Item2.Select(x => new double[] {
+                    //x[0] / 24
+                    (x[1] / 24) * 0.8
+                    , (x[1] / 24) * 1.2 }).ToArray());
             });
 
 
@@ -307,7 +314,23 @@ namespace Pipeline
             return masks.Select((x,i) => new { IDX = i, EL = x}).ToDictionary(el => tankers[el.IDX], el => el.EL);
         }
         
-        public void Algorithm()
+        public SectionMathModel CreateSectionMathModel(string name)
+        {
+            var regimes = GetTechnologicalSectionRegimes(name);
+
+            if (regimes.Count() == 0)
+                return null;
+
+            var maxFlows = GetTechnologicalSectionMaxFlows(name);
+            var tsPipes = GetTechnologicalSectionPipes(name);
+            List<SubSection> tsPumps = new List<SubSection>();
+            if (tsPipes.Count() > 1)
+                tsPumps = tsPipes.GetRange(1, tsPipes.Count() - 2);
+
+            return new SectionMathModel(regimes.Select(regime => regime.G).ToList(), tsPumps.Select(pump => pump.Target == null ? +1.0 : -1.0).ToArray(), maxFlows);
+        }
+
+        public List<double[]> Algorithm()
         {
             var targets =
                  new List<double[]>() {
@@ -332,11 +355,18 @@ namespace Pipeline
                 if (endVol > tankers[i].Volume || endVol < 0)
                 {
                     MessageBox.Show($"Ошибка исходных данных. К концу месяца объем нефти в {tankers[i].Name} будет {endVol} тыс.т.");
-                    return;
+                    return null;
                 }
             }
 
-            var tsNames = GetTechnologicalSectionNames();
+            // Проверка, можно ли перекачать по секцийм такие объемы
+
+
+            var tu1MathModel = CreateSectionMathModel("ТУ1");
+            return tu1MathModel.AddOutputElement(tu1MathModel.GetRegimesDecomposition(targets[1][0], targets[1].ToList().GetRange(1, 2).ToArray(), 0, Period - 1, new double[] { 1, 1, 1 }).Select(x => SectionMathModel.Convert(x)).ToList());
+
+           // return tu1MathModel.AddOutputElement(tu1MathModel.GetContinuousSchedule(targets[1][0], targets[1].ToList().GetRange(1, 2).ToArray(), 0, Period - 1, tu1MathModel.GetNormQuadraticWeights(new double[] { 1, 1, 1 })));
+            /*var tsNames = GetTechnologicalSectionNames();
             var tsMathModels = GetTechnologicalSectionNames().Select(name =>
             {
                 var regimes = GetTechnologicalSectionRegimes(name);
@@ -351,7 +381,7 @@ namespace Pipeline
                     tsPumps = tsPipes.GetRange(1, tsPipes.Count() - 2);
                 
                 return new SectionMathModel(regimes.Select(regime => regime.G).ToList(), tsPumps.Select(pump => pump.Target == null ? +1.0 : -1.0).ToArray(), maxFlows);
-            }).ToList();
+            }).ToList();*/
 
 
             /*var tsPipes = tsNames.Select(x => GetTechnologicalSectionPipes(x)).ToList();
@@ -393,6 +423,34 @@ namespace Pipeline
         {
             get;
             private set;
+        }
+
+        #endregion
+
+        #region Для графика, потом удалить
+
+        public List<double[]> GetTechnologicalSectionInputOutputMax(string name)
+        {
+            var maxFlows = GetTechnologicalSectionMaxFlows(name);
+            var arrMaxFlows = new List<double[]>();
+            for (int i = 0; i < Period; i++)
+            {
+                var maxFlow = new List<double>();
+                maxFlow.Add(maxFlows[i].Item1);
+                maxFlow.AddRange(maxFlows[i].Item2);
+                maxFlow.Add(maxFlows[i].Item3);
+                arrMaxFlows.Add(maxFlow.ToArray());
+            }
+
+            // Ограничиваем режимами
+            var regimes = GetTechnologicalSectionRegimes(name);
+            for(int i = 0; i < Period; i++)
+            {
+                var maxRegime = regimes.Max(x => x.G.Item1 > arrMaxFlows[i][0] ? double.NegativeInfinity : x.G.Item1);
+                arrMaxFlows[i][0] = maxRegime;
+            }
+
+            return arrMaxFlows;
         }
 
         #endregion

@@ -27,6 +27,19 @@ namespace Algorithms
             protected set;
         }
 
+        public List<double[]> ConvexHullPoints
+        {
+            get
+            {
+                if (_realDimension == 0)
+                    return new List<double[]> { _max };
+                else if (_realDimension == 1)
+                    return new List<double[]> { _min, _max };
+                else
+                    return _convexHull.Points.Select(p => ConvertFromReal(p.Position.Select(x => x).ToArray())).ToList();
+            }
+        }
+
         public ConvexHull(List<double[]> basePoints)
         {
             int dimension = basePoints[0].Count();
@@ -51,6 +64,43 @@ namespace Algorithms
                     _convexHull = MIConvexHull.ConvexHull.Create(_realPoints);
                 }
             }
+        }
+
+        /// <summary>
+        /// Создает ConvexHull из системы линейных уравнений A*x <= b
+        /// </summary>
+        /// <param name="A">Матрица A</param>
+        /// <param name="b">вектор b</param>
+        /// <returns></returns>
+        public static ConvexHull CreateFromHPolytope(double[][] A, double[] b)
+        {
+            int[] rowsNumbers = A.Select((x, i) => i).ToArray();
+            int varsCount = A[0].Count();
+            List<double[]> vertices = new List<double[]>();
+            foreach(var combination in Combinatorics.Combinations(rowsNumbers, varsCount))
+            {
+                double[,] Acomb = new double[varsCount, varsCount];
+                double[] bcomb = new double[varsCount];
+                for (int i = 0; i < varsCount; i++)
+                {
+                    for (int j = 0; j < varsCount; j++)
+                    {
+                        Acomb[i,j] = A[combination[i]][j];
+                    }
+                    bcomb[i] = b[combination[i]];
+                }
+
+                if (!Acomb.IsSingular())
+                {
+                    var potentialV = Acomb.Solve(bcomb);
+                    if (A.Dot(potentialV).Subtract(b).All(x => x <= 0))
+                        vertices.Add(potentialV);
+                }
+            }
+
+            if (vertices.Count() > 0)
+                return new ConvexHull(vertices);
+            else return null;
         }
 
         //public List<double[]> GetGridPoints(int[] stepsCount)
@@ -98,8 +148,11 @@ namespace Algorithms
             return IsRealPointInConvexHull(AlgorithmHelper.GetArrayByMask(point, _notEqMask));
         }
         
-        public double[] FindNearestInteriorPoint(double[] point)
+        public double[] FindNearestInteriorPoint(double[] point, bool notUpper, double[] weights = null)
         {
+            if (weights == null)
+                weights = _max.Select(x => 1.0).ToArray();
+
             if (point.Count() != Dimension) throw new Exception();
 
             if (_realDimension == 0)
@@ -122,7 +175,10 @@ namespace Algorithms
                 int idx = _notEqMask.IndexOf(true);
                 if (nearestPoint[idx] < _min[idx])
                 {
-                    nearestPoint[idx] = _min[idx];
+                    if (notUpper)
+                        return null;
+                    else
+                        nearestPoint[idx] = _min[idx];
                 }
                 else if (nearestPoint[idx] > _max[idx])
                 {
@@ -132,7 +188,7 @@ namespace Algorithms
                 return nearestPoint;
             }
 
-            var nearestRealPoint = NearestRealPoint(AlgorithmHelper.GetArrayByMask(nearestPoint, _notEqMask));
+            var nearestRealPoint = NearestRealPoint(AlgorithmHelper.GetArrayByMask(nearestPoint, _notEqMask), AlgorithmHelper.GetArrayByMask(weights, _notEqMask), notUpper);
             return ConvertFromReal(nearestRealPoint);
         }
 
@@ -191,10 +247,10 @@ namespace Algorithms
         /// </summary>
         /// <param name="realPoint">Точка, не принадлежащая к выпуклой оболочке</param>
         /// <returns></returns>
-        private double[] NearestRealPoint(double[] realPoint)
+        private double[] NearestRealPoint(double[] realPoint, double[] weights, bool notUpper)
         {
             var faces = _convexHull.Faces.ToList();
-
+            int fCount = faces.Count();
             // Получаем свободный член уравнений поверхностей
             double[] facesD = faces.Select(face =>
             {
@@ -203,29 +259,31 @@ namespace Algorithms
 
             double[,] Q = new double[_realDimension, _realDimension];
             double[] d = new double[_realDimension];
-            for (int i =  0; i < _realDimension; i++)
+            for (int i = 0; i < _realDimension; i++)
             {
-                for (int j = 0; j < _realDimension; j++)
-                    Q[i, j] = i != j ? 0.0 : 2.0;
-
-                d[i] = -2.0 * realPoint[i];
+                Q[i, i] = weights[i] * weights[i] * 2.0;
+                d[i] = weights[i] * weights[i] * (-2.0 * realPoint[i]);
             }
 
-            double[,] A = new double[faces.Count(), _realDimension];
-            double[] b = new double[faces.Count()];
-            for (int i = 0; i < faces.Count(); i++)
+            int constrCount = notUpper ? fCount + _realDimension : fCount;
+            double[,] A = new double[constrCount, _realDimension];
+            double[] b = new double[constrCount];
+            for (int i = 0; i < fCount; i++)
             {
-                b[i] = - facesD[i];
+                b[i] = -facesD[i];
                 for (int j = 0; j < _realDimension; j++)
                 {
-                    A[i, j] = - faces[i].Normal[j];
+                    A[i, j] = -faces[i].Normal[j];
                 }
             }
+            if (notUpper)
+                for (int i = fCount; i < fCount + _realDimension; i++)
+                {
+                    b[i] = -realPoint[i - fCount];
+                    A[i, i - fCount] = -1.0;
+                }
 
-            var solver = new GoldfarbIdnani(new QuadraticObjectiveFunction(Q, d), A, b, 0);
-            solver.Minimize();
-            if (solver.Status != GoldfarbIdnaniStatus.Success) throw new Exception();
-            return solver.Solution;
+            return AlgorithmHelper.SolveQP(Q, d, A, b, 0);
         }
 
         private double[] ConvertFromReal(double[] realPoint)
@@ -244,5 +302,7 @@ namespace Algorithms
             }
             return point;
         }
+
+
     }
 }
