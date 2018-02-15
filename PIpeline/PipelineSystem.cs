@@ -76,7 +76,7 @@ namespace Pipeline
             DiscreteSchedule tu1MainRepairs = new DiscreteSchedule(Period, bigMaxflowValue);
             tu1MainRepairs.FillInterval(61.5 / 24, 10 * 24 + 12, 10 * 24 + 13);
             tu1MainRepairs.FillInterval(46.1 / 24, 11 * 24 + 12, 11 * 24 + 16);
-            //tu1MainRepairs.FillInterval(0, 11 * 24 + 12, 11 * 24 + 24);
+            tu1MainRepairs.FillInterval(0, 11 * 24 + 12, 11 * 24 + 24);
             tu1MainRepairs.FillInterval(61.5 / 24, 12 * 24 + 12, 12 * 24 + 14);
             tu1MainRepairs.FillInterval(53.5 / 24, 17 * 24 + 12, 17 * 24 + 16);
             tu1MainRepairs.FillInterval(46.1 / 24, 18 * 24 + 12, 18 * 24 + 14);
@@ -160,8 +160,8 @@ namespace Pipeline
             {
                 regime.G = new Tuple<double, double[][]>(regime.G.Item1 / 24, regime.G.Item2.Select(x => new double[] {
                     //x[0] / 24
-                    (x[1] / 24) * 0.8
-                    , (x[1] / 24) * 1.2 }).ToArray());
+                    (x[1] / 24) * 0.95
+                    , (x[1] / 24) * 1.05 }).ToArray());
             });
 
 
@@ -335,7 +335,7 @@ namespace Pipeline
             var targets =
                  new List<double[]>() {
                     new double[] { 1584.27 },
-                    new double[] { 1586.6, 221.6, 9.8, 1818.0},
+                    new double[] { 1586.6, 221.6, /*9.8*/ 14, 1818.0},
                     new double[] { 1677.0 },
                     new double[] { 1677.0, 15.0, 1662.0},
                     new double[] { 269.0 },
@@ -363,9 +363,21 @@ namespace Pipeline
 
 
             var tu1MathModel = CreateSectionMathModel("ТУ1");
-            return tu1MathModel.AddOutputElement(tu1MathModel.GetRegimesDecomposition(targets[1][0], targets[1].ToList().GetRange(1, 2).ToArray(), 0, Period - 1, new double[] { 1, 1, 1 }).Select(x => SectionMathModel.Convert(x)).ToList());
+            tu1MathModel.Weights = new double[] { 1, 1, 1 };
+            tu1MathModel.SetZeroAvaliable(false, new bool[] { false, false });
+            var schedule = tu1MathModel.DecomposeVolumes(targets[1][0], targets[1].ToList().GetRange(1, 2).ToArray(), AlgorithmHelper.CreateListOfElements(Period, 0).Select((x, i) => i).ToArray());
+            List<double[]> result = null;
+            if (schedule == null)
+            {
+                MessageBox.Show(tu1MathModel.err.msg);
+                result = AlgorithmHelper.CreateListOfArrays(Period, 4, 0.0);
+            }
+            else
+                result = schedule.Select(x => tu1MathModel.AddOutputElement(x)).ToList();
 
-           // return tu1MathModel.AddOutputElement(tu1MathModel.GetContinuousSchedule(targets[1][0], targets[1].ToList().GetRange(1, 2).ToArray(), 0, Period - 1, tu1MathModel.GetNormQuadraticWeights(new double[] { 1, 1, 1 })));
+            return result;
+
+            //return tu1MathModel.GetContinuousSchedule(targets[1][0], targets[1].ToList().GetRange(1, 2).ToArray(), AlgorithmHelper.CreateListOfElements(Period, 0).Select((x, i) => i).ToArray()).Select(x => tu1MathModel.AddOutputElement(x)).ToList();
             /*var tsNames = GetTechnologicalSectionNames();
             var tsMathModels = GetTechnologicalSectionNames().Select(name =>
             {

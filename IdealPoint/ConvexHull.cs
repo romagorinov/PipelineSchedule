@@ -9,7 +9,7 @@ namespace Algorithms
 {    
     public class ConvexHull
     {
-        public const double EPS = 1E-10;
+        public const double EPS = 1E-8;
 
         protected List<double[]> _basePoints;
         protected double[] _max, _min;
@@ -20,6 +20,8 @@ namespace Algorithms
         protected double[] _realMax, _realMin;
 
         protected MIConvexHull.ConvexHull<MIConvexHull.DefaultVertex, MIConvexHull.DefaultConvexFace<MIConvexHull.DefaultVertex>> _convexHull;
+
+        protected Tuple<double[,], double[]> _systemOfRealInequalities;
 
         public int Dimension
         {
@@ -32,13 +34,35 @@ namespace Algorithms
             get
             {
                 if (_realDimension == 0)
-                    return new List<double[]> { _max };
+                    return new List<double[]> { _max.Select(x => x).ToArray() };
                 else if (_realDimension == 1)
-                    return new List<double[]> { _min, _max };
+                    return new List<double[]> { _min.Select(x => x).ToArray(), _max.Select(x => x).ToArray() };
                 else
-                    return _convexHull.Points.Select(p => ConvertFromReal(p.Position.Select(x => x).ToArray())).ToList();
+                    return _convexHull.Points.Select(p => ConvertFromReal(p.Position)).ToList();
             }
         }
+
+        public double[,] Amatrix
+        {
+            get;
+            private set;
+        }
+
+        public double[] Bvector
+        {
+            get;
+            private set;
+        }
+
+        public int EqNumber
+        {
+            get;
+            private set;
+        }
+
+        public double[] Max => _max;
+
+        public double[] Min => _min;
 
         public ConvexHull(List<double[]> basePoints)
         {
@@ -60,10 +84,92 @@ namespace Algorithms
                 _realMin = AlgorithmHelper.GetArrayByMask(_min, _notEqMask);
 
                 if (_realDimension > 1)
-                {
                     _convexHull = MIConvexHull.ConvexHull.Create(_realPoints);
+            }
+
+            CalculateInequalities();
+        }
+
+        private void CalculateInequalities()
+        {
+            EqNumber = Dimension - _realDimension;
+            List<double[]> AEqList = new List<double[]>();
+            List<double> BEqList = new List<double>();
+            for (int i = 0; i < Dimension; i++)
+            {
+                if (!_notEqMask[i])
+                {
+                    double[] a = new double[Dimension];
+                    a[i] = 1.0;
+                    double b = _max[i];
+                    AEqList.Add(a);
+                    BEqList.Add(b);
                 }
             }
+
+            double[,] AIneq = new double[0,0];
+            double[] BIneq = new double[0];
+            if (_realDimension == 1)
+            {
+                AIneq = new double[2, 1];
+                BIneq = new double[2];
+                AIneq[0,0] = 1.0;
+                AIneq[0,1] = -1.0;
+                BIneq[0] = _realMin[0];
+                BIneq[1] = -_realMax[0];
+            }
+            else if (_realDimension > 1)
+            {
+                var faces = _convexHull.Faces.ToList();
+                int fCount = faces.Count();
+                // Получаем свободный член уравнений поверхностей
+                double[] facesD = faces.Select(face =>
+                {
+                    return face.Normal.Zip(face.Vertices[0].Position, (x, y) => x * y).Sum();
+                }).ToArray();
+                AIneq = new double[fCount, _realDimension];
+                BIneq = new double[fCount];
+                for (int i = 0; i < fCount; i++)
+                {
+                    BIneq[i] = facesD[i];
+                    for (int j = 0; j < _realDimension; j++)
+                    {
+                        AIneq[i, j] = faces[i].Normal[j];
+                    }
+                }
+            }
+            _systemOfRealInequalities = new Tuple<double[,], double[]>(AIneq, BIneq);
+
+            int constrNumber = BEqList.Count() + BIneq.Count();
+            double[,] Aall = new double[constrNumber, Dimension];
+            double[] Ball = new double[constrNumber];
+            for (int i = 0; i < EqNumber; i++)
+            {
+                for (int j = 0; j < Dimension; j++)
+                {
+                    Aall[i, j] = AEqList[i][j];
+                    Ball[i] = BEqList[i];
+                }
+            }
+
+            for (int i = EqNumber; i < constrNumber; i++)
+            {
+                int idx = 0;
+                for (int j = 0; j < Dimension; j++)
+                {
+                    if (_notEqMask[j])
+                    {
+                        Aall[i,j] = AIneq[i - EqNumber, idx];
+                        idx++;
+                    }
+                    else
+                        Aall[i,j] = _max[j];
+                }
+                Ball[i] = BIneq[i];
+            }
+
+            Amatrix = Aall;
+            Bvector = Ball;
         }
 
         /// <summary>
@@ -93,7 +199,7 @@ namespace Algorithms
                 if (!Acomb.IsSingular())
                 {
                     var potentialV = Acomb.Solve(bcomb);
-                    if (A.Dot(potentialV).Subtract(b).All(x => x <= 0))
+                    if (A.Dot(potentialV).Subtract(b).All(x => x <= EPS))
                         vertices.Add(potentialV);
                 }
             }
@@ -102,7 +208,7 @@ namespace Algorithms
                 return new ConvexHull(vertices);
             else return null;
         }
-
+        
         //public List<double[]> GetGridPoints(int[] stepsCount)
         //{
         //    if (_realDimension == 0)
@@ -148,7 +254,7 @@ namespace Algorithms
             return IsRealPointInConvexHull(AlgorithmHelper.GetArrayByMask(point, _notEqMask));
         }
         
-        public double[] FindNearestInteriorPoint(double[] point, bool notUpper, double[] weights = null)
+        public double[] FindNearestInteriorPoint(double[] point, bool[] notUpper, double[] weights = null)
         {
             if (weights == null)
                 weights = _max.Select(x => 1.0).ToArray();
@@ -175,7 +281,7 @@ namespace Algorithms
                 int idx = _notEqMask.IndexOf(true);
                 if (nearestPoint[idx] < _min[idx])
                 {
-                    if (notUpper)
+                    if (notUpper[idx])
                         return null;
                     else
                         nearestPoint[idx] = _min[idx];
@@ -188,7 +294,7 @@ namespace Algorithms
                 return nearestPoint;
             }
 
-            var nearestRealPoint = NearestRealPoint(AlgorithmHelper.GetArrayByMask(nearestPoint, _notEqMask), AlgorithmHelper.GetArrayByMask(weights, _notEqMask), notUpper);
+            var nearestRealPoint = NearestRealPoint(AlgorithmHelper.GetArrayByMask(nearestPoint, _notEqMask), AlgorithmHelper.GetArrayByMask(weights, _notEqMask), AlgorithmHelper.GetArrayByMask(notUpper, _notEqMask));
             return ConvertFromReal(nearestRealPoint);
         }
 
@@ -227,19 +333,7 @@ namespace Algorithms
 
         private bool IsRealPointInConvexHull(double[] realPoint)
         {
-            foreach (var face in _convexHull.Faces)
-            {
-                // Вектор от тестируемой точки
-                double[] vec = AlgorithmHelper.GetDifOfVectors(face.Vertices[0].Position, realPoint);
-
-                // Проверяем сонаправленность с нормалью
-                if (vec.Dot(face.Normal) < -EPS)
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            return !_systemOfRealInequalities.Item1.Dot(realPoint).Subtract(_systemOfRealInequalities.Item2).Any(x => x > EPS);
         }
         
         /// <summary>
@@ -247,7 +341,7 @@ namespace Algorithms
         /// </summary>
         /// <param name="realPoint">Точка, не принадлежащая к выпуклой оболочке</param>
         /// <returns></returns>
-        private double[] NearestRealPoint(double[] realPoint, double[] weights, bool notUpper)
+        private double[] NearestRealPoint(double[] realPoint, double[] weights, bool[] notUpper)
         {
             var faces = _convexHull.Faces.ToList();
             int fCount = faces.Count();
@@ -265,7 +359,8 @@ namespace Algorithms
                 d[i] = weights[i] * weights[i] * (-2.0 * realPoint[i]);
             }
 
-            int constrCount = notUpper ? fCount + _realDimension : fCount;
+            bool hasUpperBound = notUpper.Any(x => x);
+            int constrCount = hasUpperBound ? fCount + _realDimension : fCount;
             double[,] A = new double[constrCount, _realDimension];
             double[] b = new double[constrCount];
             for (int i = 0; i < fCount; i++)
@@ -276,11 +371,12 @@ namespace Algorithms
                     A[i, j] = -faces[i].Normal[j];
                 }
             }
-            if (notUpper)
+            if (hasUpperBound)
                 for (int i = fCount; i < fCount + _realDimension; i++)
                 {
-                    b[i] = -realPoint[i - fCount];
-                    A[i, i - fCount] = -1.0;
+                    int dim = i - fCount;
+                    b[i] = notUpper[dim] ? -realPoint[dim] : -_realMax[dim] * 0.1;
+                    A[i, dim] = -1.0;
                 }
 
             return AlgorithmHelper.SolveQP(Q, d, A, b, 0);
@@ -288,6 +384,9 @@ namespace Algorithms
 
         private double[] ConvertFromReal(double[] realPoint)
         {
+            if (realPoint == null)
+                return null;
+
             int idx = 0;
             double[] point = new double[Dimension];
             for (int i = 0; i < Dimension; i++)
@@ -302,7 +401,6 @@ namespace Algorithms
             }
             return point;
         }
-
-
+        
     }
 }

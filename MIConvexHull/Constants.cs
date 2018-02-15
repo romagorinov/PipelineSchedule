@@ -24,30 +24,23 @@
  *  
  *****************************************************************************/
 
+using System;
+
 namespace MIConvexHull
 {
-    /// <summary>
-    /// An interface for a structure with nD position.
-    /// </summary>
-    public interface IVertex
+    internal static class Constants
     {
         /// <summary>
-        /// Position of the vertex.
+        /// The default plane distance tolerance
         /// </summary>
-        /// <value>The position.</value>
-        double[] Position { get; }
-    }
-
-    /// <summary>
-    /// "Default" vertex.
-    /// </summary>
-    /// <seealso cref="MIConvexHull.IVertex" />
-    public class DefaultVertex : IVertex
-    {
+        internal const double DefaultPlaneDistanceTolerance = 1e-10;
         /// <summary>
-        /// Position of the vertex.
+        /// The starting delta dot product in simplex
         /// </summary>
-        /// <value>The position.</value>
-        public double[] Position { get; set; }
+        internal const double StartingDeltaDotProductInSimplex = 0.5;
+        /// <summary>
+        /// The connector table size
+        /// </summary>
+        internal const int ConnectorTableSize = 2017;
     }
 }

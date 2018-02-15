@@ -490,5 +490,34 @@ namespace Algorithms
         {
             return SolveQP(Q.ToMatrix(), d, A.ToMatrix(), b, eq);
         }
+
+        public static bool InQuad(double[] point, double[][] intervals)
+        {
+            for (int i =  0; i < point.Count(); i++)
+            {
+                if (point[i] < intervals[i][0] || point[i] > intervals[i][1])
+                    return false;
+            }
+
+            return true;
+        }
+
+        public static double[] GetRandomPointInQuad(double[] intervalsMin, double[] intervalsMax)
+        {
+            double[] point = new double[intervalsMin.Count()];
+            for (int i = 0; i < intervalsMin.Count(); i++)
+            {
+                double intervalLen = intervalsMax[i] - intervalsMin[i],
+                    rnd = RandomInstance.NextDouble();
+                point[i] = intervalsMin[i] + rnd * intervalLen;
+            }
+            return point;
+        }
+
+        public static List<double[]> RoundList(List<double[]> list, int digits)
+        {
+            return list.Select(arr => arr.Select(x => Math.Round(x, digits)).ToArray()).ToList();
+        }
+        
     }
 }

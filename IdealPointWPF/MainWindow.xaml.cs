@@ -424,6 +424,7 @@ namespace IdealPointWPF
         {
             PipelineSystem p = new PipelineSystem();
             GetBasePlots(p);
+
             List<double[]> tu1 = p.Algorithm();
 
             double[] zeros = new double[p.Period];

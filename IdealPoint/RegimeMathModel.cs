@@ -10,6 +10,8 @@ namespace Algorithms
 {
     public class RegimeMathModel
     {
+        const double EPS = 1E-8;
+
         public double Gin;
 
         public double[] GpumpMax;
@@ -43,16 +45,10 @@ namespace Algorithms
             {
                 A[i * 2] = new double[PumpsCount];
                 A[i * 2 + 1] = new double[PumpsCount];
+                A[i * 2][i] = 1.0;
+                A[i * 2 + 1][i] = -1.0;
                 b[i * 2] = Math.Min(GpumpMax[i], repair.MaxPumps[i]);
                 b[i * 2 + 1] = - GpumpMin[i];
-                for (int j = 0; j < PumpsCount; j++)
-                {
-                    if (i == j)
-                    {
-                        A[i * 2][j] = 1.0;
-                        A[i * 2 + 1][j] = - 1.0;
-                    }
-                }
 
                 A[rowsCount - 1][i] = pumpSign[i];
             }
@@ -75,9 +71,20 @@ namespace Algorithms
             for (int i = 0; i < ineq.Item1.Count(); i++)
             {
                 var multipleResult = ineq.Item1[i].Zip(Gpumps, (x, y) => x * y).Sum();
-                if (multipleResult > ineq.Item2[i])
+                if (multipleResult - ineq.Item2[i] > EPS)
                     return false;
             }
+
+            return true;
+        }
+
+        public bool MeetsZeroConditions(bool inZero, bool[] pumpsZero)
+        {
+            if (!inZero && Gin == 0)
+                return false;
+
+            if (GpumpMax.Zip(pumpsZero, (x, y) => !y && x == 0).Any(x => x))
+                return false;
 
             return true;
         }
@@ -103,7 +110,7 @@ namespace Algorithms
             return AlgorithmHelper.SolveQP(Q, d, A, b, 0);
         }
 
-        public static bool operator == (RegimeMathModel r1, RegimeMathModel r2)
+        /*public static bool operator == (RegimeMathModel r1, RegimeMathModel r2)
         {
             return r1.Gin == r2.Gin
                 && r1.GpumpMax.SequenceEqual(r2.GpumpMax)
@@ -117,6 +124,6 @@ namespace Algorithms
                 || !r1.GpumpMax.SequenceEqual(r2.GpumpMax)
                 || !r1.GpumpMin.SequenceEqual(r2.GpumpMin)
                 || !r1.pumpSign.SequenceEqual(r2.pumpSign);
-        }
+        }*/
     }
 }
