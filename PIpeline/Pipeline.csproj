@@ -78,10 +78,6 @@
       <Project>{7a3f33c4-3d89-4409-a442-6ec53a689df3}</Project>
       <Name>Algorithms</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Show\Show.csproj">
-      <Project>{318942c4-7c93-498e-b176-26970f4989ed}</Project>
-      <Name>Show</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <COMReference Include="Microsoft.Office.Core">

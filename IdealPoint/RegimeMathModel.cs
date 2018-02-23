@@ -34,6 +34,11 @@ namespace Algorithms
             PumpsCount = pumpSign.Count();
         }
 
+        /// <summary>
+        /// Система "МЕНЬШЕ ИЛИ РАВНО"
+        /// </summary>
+        /// <param name="repair"></param>
+        /// <returns></returns>
         public Tuple<double[][], double[]> GetSystemOfInequalities(RepairMathModel repair)
         {
             int rowsCount = PumpsCount * 2 + 1;

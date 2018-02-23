@@ -84,12 +84,17 @@ namespace Algorithms
                 _realMin = AlgorithmHelper.GetArrayByMask(_min, _notEqMask);
 
                 if (_realDimension > 1)
+                {
                     _convexHull = MIConvexHull.ConvexHull.Create(_realPoints);
+                }
             }
 
             CalculateInequalities();
         }
 
+        /// <summary>
+        /// Система из равенств и неравенств "МЕНЬШЕ ИЛИ РАВНО"
+        /// </summary>
         private void CalculateInequalities()
         {
             EqNumber = Dimension - _realDimension;
@@ -113,10 +118,10 @@ namespace Algorithms
             {
                 AIneq = new double[2, 1];
                 BIneq = new double[2];
-                AIneq[0,0] = 1.0;
-                AIneq[0,1] = -1.0;
-                BIneq[0] = _realMin[0];
-                BIneq[1] = -_realMax[0];
+                AIneq[0,0] = -1.0;
+                AIneq[1,0] = 1.0;
+                BIneq[0] = -_realMin[0];
+                BIneq[1] = _realMax[0];
             }
             else if (_realDimension > 1)
             {
@@ -163,9 +168,9 @@ namespace Algorithms
                         idx++;
                     }
                     else
-                        Aall[i,j] = _max[j];
+                        Aall[i,j] = 0.0;
                 }
-                Ball[i] = BIneq[i];
+                Ball[i] = BIneq[i - EqNumber];
             }
 
             Amatrix = Aall;

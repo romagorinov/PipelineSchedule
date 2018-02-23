@@ -160,8 +160,8 @@ namespace Pipeline
             {
                 regime.G = new Tuple<double, double[][]>(regime.G.Item1 / 24, regime.G.Item2.Select(x => new double[] {
                     //x[0] / 24
-                    (x[1] / 24) * 0.95
-                    , (x[1] / 24) * 1.05 }).ToArray());
+                    (x[1] / 24) * 0.6
+                    , (x[1] / 24) * 1.6 }).ToArray());
             });
 
 
@@ -229,7 +229,7 @@ namespace Pipeline
             //    }
             //}
         }
-
+        
 
         public NamedObject GetPoint(string name)
         {
@@ -314,7 +314,7 @@ namespace Pipeline
             return masks.Select((x,i) => new { IDX = i, EL = x}).ToDictionary(el => tankers[el.IDX], el => el.EL);
         }
         
-        public SectionMathModel CreateSectionMathModel(string name)
+        public ISection CreateSectionMathModel(string name)
         {
             var regimes = GetTechnologicalSectionRegimes(name);
 
@@ -325,24 +325,17 @@ namespace Pipeline
             var tsPipes = GetTechnologicalSectionPipes(name);
             List<SubSection> tsPumps = new List<SubSection>();
             if (tsPipes.Count() > 1)
-                tsPumps = tsPipes.GetRange(1, tsPipes.Count() - 2);
-
-            return new SectionMathModel(regimes.Select(regime => regime.G).ToList(), tsPumps.Select(pump => pump.Target == null ? +1.0 : -1.0).ToArray(), maxFlows);
+                return new SectionWithPumpsMathModel(regimes.Select(regime => regime.G).ToList(), tsPipes.GetRange(1, tsPipes.Count() - 2).Select(pump => pump.Target == null ? +1.0 : -1.0).ToArray(), maxFlows);
+            else
+                return new SectionMathModel(regimes.Select(regime => regime.G.Item1).ToList(), maxFlows.Select(x => x.Item1).ToList());            
         }
 
-        public List<double[]> Algorithm()
+        public Dictionary<string, List<double[]>> Algorithm(Dictionary<string, List<Tuple<double[], int[]>>> targets, double[] tankersStartVolume)
         {
-            var targets =
-                 new List<double[]>() {
-                    new double[] { 1584.27 },
-                    new double[] { 1586.6, 221.6, /*9.8*/ 14, 1818.0},
-                    new double[] { 1677.0 },
-                    new double[] { 1677.0, 15.0, 1662.0},
-                    new double[] { 269.0 },
-                    new double[] { 162.847 } };
-            var tankersStartVolume = new double[] { 12.8, 30.6, 17.7 };
-
-            var targetsVector = AlgorithmHelper.ListToVector(targets);
+            var targetsVector = GetTechnologicalSectionNames()
+                    .Select(n => targets[n].Aggregate(targets[n][0].Item1.Select(x => 0.0).ToArray(), (total, current) => total.Add(current.Item1)))
+                    .SelectMany(x => x)
+                    .ToArray();
 
             // Проверка на объем РП
             var tankers = points.Where(x => x.GetType() == typeof(Reservoir)).Select(x => x as Reservoir).ToList();
@@ -359,66 +352,38 @@ namespace Pipeline
                 }
             }
 
-            // Проверка, можно ли перекачать по секцийм такие объемы
-
-
-            var tu1MathModel = CreateSectionMathModel("ТУ1");
-            tu1MathModel.Weights = new double[] { 1, 1, 1 };
-            tu1MathModel.SetZeroAvaliable(false, new bool[] { false, false });
-            var schedule = tu1MathModel.DecomposeVolumes(targets[1][0], targets[1].ToList().GetRange(1, 2).ToArray(), AlgorithmHelper.CreateListOfElements(Period, 0).Select((x, i) => i).ToArray());
-            List<double[]> result = null;
-            if (schedule == null)
+            Func<Tuple<List<double[]>, List<int>>, List<double[]>> Convert = (Tuple<List<double[]>, List<int>> tuple) =>
             {
-                MessageBox.Show(tu1MathModel.err.msg);
-                result = AlgorithmHelper.CreateListOfArrays(Period, 4, 0.0);
-            }
-            else
-                result = schedule.Select(x => tu1MathModel.AddOutputElement(x)).ToList();
-
-            return result;
-
-            //return tu1MathModel.GetContinuousSchedule(targets[1][0], targets[1].ToList().GetRange(1, 2).ToArray(), AlgorithmHelper.CreateListOfElements(Period, 0).Select((x, i) => i).ToArray()).Select(x => tu1MathModel.AddOutputElement(x)).ToList();
-            /*var tsNames = GetTechnologicalSectionNames();
-            var tsMathModels = GetTechnologicalSectionNames().Select(name =>
-            {
-                var regimes = GetTechnologicalSectionRegimes(name);
-
-                if (regimes.Count() == 0)
-                    return null;
-
-                var maxFlows = GetTechnologicalSectionMaxFlows(name);
-                var tsPipes = GetTechnologicalSectionPipes(name);
-                List<SubSection> tsPumps = new List<SubSection>();
-                if (tsPipes.Count() > 1)
-                    tsPumps = tsPipes.GetRange(1, tsPipes.Count() - 2);
-                
-                return new SectionMathModel(regimes.Select(regime => regime.G).ToList(), tsPumps.Select(pump => pump.Target == null ? +1.0 : -1.0).ToArray(), maxFlows);
-            }).ToList();*/
-
-
-            /*var tsPipes = tsNames.Select(x => GetTechnologicalSectionPipes(x)).ToList();
-            var tsMaxFlows = tsNames.Select(x => GetTechnologicalSectionMaxFlows(x)).ToList();
-
-            var tsSurplusMask = new List<bool[]>
-            {
-                null,
-                new bool[] { true, true, true, false },
-                new bool[] { true },
-                new bool[] { true, true, false},
-                null,
-                null
+                var arr = tuple.Item1.ToArray();
+                Array.Sort(tuple.Item2.ToArray(), arr);
+                return arr.ToList();
             };
 
-            var tsMathModels = tsRegimes.Zip(tsSurplusMask, (x,y) => 
-                y == null ? null : new SectionMathModel(AlgorithmHelper.RemoveDuplicates(AlgorithmHelper.MaskListOfArrays(x, y)))).ToList();
+            var result = new Dictionary<string, List<double[]>>();
+            foreach(var target in targets)
+            {
+                var tuMathModel = CreateSectionMathModel(target.Key);
+                if (tuMathModel != null)
+                {
+                    var schedule = tuMathModel.GetSchedule(target.Value);
+                    if (schedule == null)
+                    {
+                        MessageBox.Show($"Ошибка исходных данных. По {target.Key} нельзя перекачать заданные объемы");
+                        return null;
+                    }
+                    else
+                    {
+                        var convertScheudule = Convert(schedule);
+                        if (tuMathModel.GetType() == typeof(SectionWithPumpsMathModel))
+                        {
+                            convertScheudule = convertScheudule.Select(x => (tuMathModel as SectionWithPumpsMathModel).AddOutputElement(x)).ToList();
+                        }
+                        result.Add(target.Key, convertScheudule);
+                    }
+                }
+            }
 
-            var minVol = targets[1].Select(x => x * 0.99).ToArray();
-            minVol[0] = targets[1][0] * 0.99;
-            var maxVol = targets[1].Select(x => x).ToArray();
-            maxVol[0] = targets[1][0] * 1.01;
-            var schedule = tsMathModels[1].GetOptimalDecomposition(targets[1], minVol, maxVol, Period, new double[] { 1, 2, 1.5 });
-
-            var vol = AlgorithmHelper.GetSumOnInterval(schedule.Select(x => x.Item1.Select(y => y * x.Item2).ToArray()).ToList(), 0, schedule.Count());*/
+            return result;
         }
 
         #endregion

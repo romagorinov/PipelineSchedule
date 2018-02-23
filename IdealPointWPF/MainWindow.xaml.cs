@@ -1,24 +1,13 @@
-﻿using Algorithms;
-using OxyPlot;
+﻿using OxyPlot;
 using Pipeline;
 using Pipeline.PipelineObjects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using OxyPlot.Series;
 using System.Threading;
-using Show;
+using Accord.Math;
 
 namespace IdealPointWPF
 {
@@ -425,20 +414,44 @@ namespace IdealPointWPF
             PipelineSystem p = new PipelineSystem();
             GetBasePlots(p);
 
-            List<double[]> tu1 = p.Algorithm();
+            var tu3Interval = Accord.Math.Vector.EnumerableRange(12 * 24, 19 * 24).ToArray();
+            var interval = Accord.Math.Vector.EnumerableRange(0, p.Period).ToArray();
+            var targets = new Dictionary<string, List<Tuple<double[], int[]>>>()
+            {
+                {"ТУ0", new List<Tuple<double[], int[]>>() {
+                    new Tuple<double[], int[]>(new double[] { 1584.27 }, interval) } },
+                {"ТУ1", new List<Tuple<double[], int[]>>() {
+                    new Tuple<double[], int[]>(new double[] { 1586.6, 221.6, /*9.8*/ 14, 1586.6 + 221.6 + 14 }, interval) } },
+                {"ТУ2", new List<Tuple<double[], int[]>>() {
+                    new Tuple<double[], int[]>(new double[] { 1650.0 }, interval) } },
+                {"ТУ3", new List<Tuple<double[], int[]>>() {
+                    new Tuple<double[], int[]>(new double[] { 350, 15.0, 350 - 15.0 }, tu3Interval),
+                    new Tuple<double[], int[]>(new double[] { 1640 - 350, 0, 1640 - 350}, interval.Except(tu3Interval).ToArray()) } },
+                {"Труба откачка У НПЗ", new List<Tuple<double[], int[]>>() {
+                    new Tuple<double[], int[]>(new double[] { 269.0 }, interval) } },
+                {"Труба подкачка ГНПС 2", new List<Tuple<double[], int[]>>() {
+                    new Tuple<double[], int[]>(new double[] { 162.847 }, interval) } }
+            };
+
+            var tankersStartVolume = new double[] { 12.8, 30.6, 17.7 };
+
+            Dictionary<string, List<double[]>> tuSchedules = p.Algorithm(targets, tankersStartVolume);
+
+            if (tuSchedules == null)
+                return;
 
             double[] zeros = new double[p.Period];
 
             SetPlots(
                 zeros,
-                tu1.Select(x => x[0]).ToArray(),
-                tu1.Select(x => x[1]).ToArray(),
-                tu1.Select(x => x[2]).ToArray(),
-                tu1.Select(x => x[3]).ToArray(),
-                zeros,
-                zeros,
-                zeros,
-                zeros,
+                tuSchedules["ТУ1"].Select(x => x[0]).ToArray(),
+                tuSchedules["ТУ1"].Select(x => x[1]).ToArray(),
+                tuSchedules["ТУ1"].Select(x => x[2]).ToArray(),
+                tuSchedules["ТУ1"].Select(x => x[3]).ToArray(),
+                tuSchedules["ТУ2"].Select(x => x[0]).ToArray(),
+                tuSchedules["ТУ3"].Select(x => x[0]).ToArray(),
+                tuSchedules["ТУ3"].Select(x => x[1]).ToArray(),
+                tuSchedules["ТУ3"].Select(x => x[2]).ToArray(),
                 0,
                 0,
                 0,
