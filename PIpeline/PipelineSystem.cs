@@ -330,10 +330,10 @@ namespace Pipeline
                 return new SectionMathModel(regimes.Select(regime => regime.G.Item1).ToList(), maxFlows.Select(x => x.Item1).ToList());            
         }
 
-        public Dictionary<string, List<double[]>> Algorithm(Dictionary<string, List<Tuple<double[], int[]>>> targets, double[] tankersStartVolume)
+        public Dictionary<string, List<double[]>> Algorithm(PumpsParameters targets, double[] tankersStartVolume)
         {
             var targetsVector = GetTechnologicalSectionNames()
-                    .Select(n => targets[n].Aggregate(targets[n][0].Item1.Select(x => 0.0).ToArray(), (total, current) => total.Add(current.Item1)))
+                    .Select(n => targets.batches[n].Aggregate(targets.batches[n][0].Item1.Select(x => 0.0).ToArray(), (total, current) => total.Add(current.Item1)))
                     .SelectMany(x => x)
                     .ToArray();
 
@@ -359,12 +359,14 @@ namespace Pipeline
                 return arr.ToList();
             };
 
-            var result = new Dictionary<string, List<double[]>>();
-            foreach(var target in targets)
+            var initialSchedules = new Dictionary<string, List<double[]>>();
+            var tuMathModels = new Dictionary<string, ISection>();
+            foreach(var target in targets.batches)
             {
                 var tuMathModel = CreateSectionMathModel(target.Key);
                 if (tuMathModel != null)
                 {
+                    tuMathModels.Add(target.Key, tuMathModel);
                     var schedule = tuMathModel.GetSchedule(target.Value);
                     if (schedule == null)
                     {
@@ -378,12 +380,71 @@ namespace Pipeline
                         {
                             convertScheudule = convertScheudule.Select(x => (tuMathModel as SectionWithPumpsMathModel).AddOutputElement(x)).ToList();
                         }
-                        result.Add(target.Key, convertScheudule);
+                        initialSchedules.Add(target.Key, convertScheudule);
                     }
                 }
             }
 
-            return result;
+            var r1MathModel = new ReservoirSectionMathModel(tankers[0].Volume, tankersStartVolume[0], null, tuMathModels["ТУ1"]);
+            r1MathModel.SetTempParams(null, initialSchedules["ТУ1"], AlgorithmHelper.CreateListOfElements(Period, targets.batches["ТУ0"][0].Item1[0] / Period));
+
+
+            return initialSchedules;
+        }
+
+        #endregion
+
+        #region Вспомогательные структуры и классы
+
+        public class PumpsParameters
+        {
+            public HashSet<string> names = new HashSet<string>();
+            public Dictionary<string, bool> uniformity = new Dictionary<string, bool>();
+            public Dictionary<string, List<Tuple<double[], int[]>>> batches = new Dictionary<string, List<Tuple<double[], int[]>>>();
+
+            public PumpsParameters(List<string> names)
+            {
+                names.ForEach((name) =>
+                {
+                    if (!this.names.Add(name))
+                        throw new Exception();
+
+                    uniformity.Add(name, false);
+                    batches.Add(name, new List<Tuple<double[], int[]>>());
+                });
+            }
+
+            public bool SetUniformity(string name, bool val)
+            {
+                if (!name.Contains(name))
+                    return false;
+
+                uniformity[name] = val;
+
+                return true;
+            }
+
+            public bool AddBatch(string name, double[] volumes, int[] intervals)
+            {
+                if (!name.Contains(name))
+                    return false;
+
+                if (batches[name].Count() > 0)
+                {
+                    if (batches[name].Last().Item1.Count() != volumes.Count())
+                        return false;
+
+                    foreach(var kv in batches[name])
+                    {
+                        if (kv.Item2.Intersect(intervals).Count() > 0)
+                            return false;
+                    }
+                }
+
+                batches[name].Add(new Tuple<double[], int[]>(volumes, intervals));
+
+                return true;
+            }
         }
 
         #endregion

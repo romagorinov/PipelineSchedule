@@ -39,6 +39,8 @@ namespace Algorithms
         
         Tuple<double, double[]> _normCoefficients;
 
+        public Error err = new Error() { errorNumber = 1, msg = "Расчетов не производилось" };
+
         #endregion
 
         #endregion
@@ -67,6 +69,12 @@ namespace Algorithms
         }
 
         private int[] DefaultIndexes => _repairs.Select((x, i) => i).ToArray();
+
+        public IntervalsParameters CurrentIntervalsParameters
+        {
+            get;
+            set;
+        }
 
         #endregion
 
@@ -132,28 +140,120 @@ namespace Algorithms
             public int errorNumber;
             public string msg;
         }
-
-        public Error err = new Error() { errorNumber = 1, msg = "Расчетов не производилось" };
         
-        struct IntervalsParameters
+        public class IntervalsParameters
         {
             public Dictionary<int, HashSet<RegimeMathModel>> avaliableRegimesOnIntervals;
             public Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>> sameParamsIntervals;
             public Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, ConvexHull> convexHulls;
             public Dictionary<int, ConvexHull> convexHullOnIntervals;
-        }
 
-        IntervalsParameters tempParameters = new IntervalsParameters();
+            public IntervalsParameters() { }
+
+            public bool IsValid(SectionWithPumpsMathModel model)
+            {
+                if (avaliableRegimesOnIntervals == null
+                    || sameParamsIntervals == null
+                    || convexHulls == null
+                    || convexHullOnIntervals == null)
+                    return false;
+
+                for(int i = 0; i < model._period; i++)
+                {
+                    if (!avaliableRegimesOnIntervals.ContainsKey(i) || !convexHullOnIntervals.ContainsKey(i) || !sameParamsIntervals.Any(kv => kv.Value.Contains(i)))
+                        return false;
+                }
+
+                return true;
+            }
+        }
 
         #endregion
 
         #region Методы
 
         #region Служебные функции
-                
+        
+        public void CalcDefaultIntervalsParameters(List<Tuple<double[], int[]>> volumes)
+        {
+            var temp = volumes.SelectMany(x => x.Item2);
+            if (temp.Count() != temp.Distinct().Count())
+                throw new Exception();
+
+            // Предрасчеты
+            Dictionary<int, HashSet<RegimeMathModel>> avaliableRegimesOnIntervals = new Dictionary<int, HashSet<RegimeMathModel>>();
+            foreach (var tuple in volumes)
+            {
+                var volumeIn = tuple.Item1[0];
+                var volumePump = Convert(tuple.Item1).Item2;
+                var indexes = tuple.Item2.ToList();
+
+                // Нулевой режим
+                if (volumeIn == 0.0)
+                {
+                    indexes.ForEach(idx => avaliableRegimesOnIntervals.Add(idx, new HashSet<RegimeMathModel>() { _regimes.First(regime => regime.Gin == 0.0) }));
+                }
+                else
+                {
+                    foreach (var idx in indexes)
+                    {
+                        var repair = _repairs[idx];
+
+                        // Допустимы по ремонтам, обязательно
+                        var canUseRegimes = _regimes.Where(regime => regime.CanUse(repair));
+
+                        if (canUseRegimes.Count() == 0)
+                            throw new Exception();
+
+                        // Не качаем, когда не нужно, на подкачки, обязательно
+                        canUseRegimes = canUseRegimes.Where(regime => !volumePump.Zip(regime.GpumpMin, (x, y) => x == 0 && y != 0).Any(x => x));
+
+                        // Убираем нулевой режим
+                        var technologyRegimes = canUseRegimes.Where(regime => regime.Gin != 0);
+
+                        if (technologyRegimes.Count() == 0)
+                            technologyRegimes = canUseRegimes;
+
+                        // Качаем на подкачки, когда нужно
+                        var needUseRegimes = technologyRegimes.Where(regime => !regime.GpumpMax.Zip(volumePump, (x, y) => x == 0 && y != 0).Any(x => x));
+
+                        if (needUseRegimes.Count() == 0)
+                            needUseRegimes = technologyRegimes;
+
+                        avaliableRegimesOnIntervals.Add(idx, new HashSet<RegimeMathModel>(needUseRegimes));
+                    }
+                }
+            }
+
+            Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>> sameParamsIntervals = new Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>>();
+            foreach (var kv in avaliableRegimesOnIntervals)
+            {
+                var idx = kv.Key;
+                var hashSet = kv.Value;
+                var repair = _repairs[idx];
+                var existentKey = sameParamsIntervals.Keys.FirstOrDefault(x => x.Item1.SetEquals(hashSet) && x.Item2 == repair);
+
+                if (existentKey == null)
+                    sameParamsIntervals.Add(new Tuple<HashSet<RegimeMathModel>, RepairMathModel>(hashSet, repair), new List<int>() { idx });
+                else
+                    sameParamsIntervals[existentKey].Add(idx);
+            }
+
+            Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, ConvexHull> convexHulls = sameParamsIntervals
+                .Select(x => new { KEY = x.Key, VALUE = GetConvex(x.Key.Item1.ToList(), x.Key.Item2) })
+                .ToDictionary(x => x.KEY, x => x.VALUE);
+
+            Dictionary<int, ConvexHull> convexHullOnIntervals = new Dictionary<int, ConvexHull>();
+            foreach (var kv in sameParamsIntervals)
+                foreach (var idx in kv.Value)
+                    convexHullOnIntervals.Add(idx, convexHulls[kv.Key]);
+
+            CurrentIntervalsParameters = new IntervalsParameters() { avaliableRegimesOnIntervals = avaliableRegimesOnIntervals, convexHullOnIntervals = convexHullOnIntervals, convexHulls = convexHulls, sameParamsIntervals = sameParamsIntervals };
+        }
+
         private Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>> GetSameParamsIntervals(int[] indexes)
         {
-            return tempParameters.sameParamsIntervals
+            return CurrentIntervalsParameters.sameParamsIntervals
                 .ToDictionary(x => x.Key, x => x.Value.Where(y => indexes.Contains(y)).ToList())
                 .Where(kv => kv.Value.Count() > 0)
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
@@ -208,75 +308,8 @@ namespace Algorithms
             if (temp.Count() != temp.Distinct().Count())
                 throw new Exception();
 
-            // Предрасчеты
-            Dictionary<int, HashSet<RegimeMathModel>> avaliableRegimesOnIntervals = new Dictionary<int, HashSet<RegimeMathModel>>();
-            foreach(var tuple in volumes)
-            {
-                var volumeIn = tuple.Item1[0];
-                var volumePump = Convert(tuple.Item1).Item2;
-                var indexes = tuple.Item2.ToList();
-                
-                // Нулевой режим
-                if (volumeIn == 0.0)
-                {
-                    indexes.ForEach(idx => avaliableRegimesOnIntervals.Add(idx, new HashSet<RegimeMathModel>() { _regimes.First(regime => regime.Gin == 0.0) }));
-                }
-                else
-                {
-                    foreach (var idx in  indexes)
-                    {
-                        var repair = _repairs[idx];
-
-                        // Допустимы по ремонтам, обязательно
-                        var canUseRegimes = _regimes.Where(regime => regime.CanUse(repair));
-
-                        if (canUseRegimes.Count() == 0)
-                            throw new Exception();
-
-                        // Не качаем, когда не нужно, на подкачки, обязательно
-                        canUseRegimes = canUseRegimes.Where(regime => !volumePump.Zip(regime.GpumpMin, (x, y) => x == 0 && y != 0).Any(x => x));
-
-                        // Убираем нулевой режим
-                        var technologyRegimes = canUseRegimes.Where(regime => regime.Gin != 0);
-
-                        if (technologyRegimes.Count() == 0)
-                            technologyRegimes = canUseRegimes;
-
-                        // Качаем на подкачки, когда нужно
-                        var needUseRegimes = technologyRegimes.Where(regime => !regime.GpumpMax.Zip(volumePump, (x, y) => x == 0 && y != 0).Any(x => x));
-
-                        if (needUseRegimes.Count() == 0)
-                            needUseRegimes = technologyRegimes;
-
-                        avaliableRegimesOnIntervals.Add(idx, new HashSet<RegimeMathModel>(needUseRegimes));
-                    }
-                }
-            }
-
-            Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>> sameParamsIntervals = new Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>>();
-            foreach(var kv in avaliableRegimesOnIntervals)
-            {
-                var idx = kv.Key;
-                var hashSet = kv.Value;
-                var repair = _repairs[idx];
-                var existentKey = sameParamsIntervals.Keys.FirstOrDefault(x => x.Item1.SetEquals(hashSet) && x.Item2 == repair);
-
-                if (existentKey == null)
-                    sameParamsIntervals.Add(new Tuple<HashSet<RegimeMathModel>, RepairMathModel>(hashSet, repair), new List<int>() { idx });
-                else
-                    sameParamsIntervals[existentKey].Add(idx);
-            }
-
-            Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, ConvexHull> convexHulls = sameParamsIntervals
-                .Select(x => new { KEY = x.Key, VALUE = GetConvex(x.Key.Item1.ToList(), x.Key.Item2)})
-                .ToDictionary(x => x.KEY, x => x.VALUE);
-
-            Dictionary<int, ConvexHull> convexHullOnIntervals = new Dictionary<int, ConvexHull>();
-            foreach (var kv in sameParamsIntervals)
-                foreach (var idx in kv.Value)
-                    convexHullOnIntervals.Add(idx, convexHulls[kv.Key]);
-
-            tempParameters = new IntervalsParameters() { avaliableRegimesOnIntervals = avaliableRegimesOnIntervals, convexHullOnIntervals = convexHullOnIntervals, convexHulls = convexHulls, sameParamsIntervals = sameParamsIntervals };
+            if (CurrentIntervalsParameters == null)
+                CalcDefaultIntervalsParameters(volumes);
 
             Tuple<List<double[]>, List<int>> result = new Tuple<List<double[]>, List<int>>(new List<double[]>(), new List<int>());
             foreach(var tuple in volumes)
@@ -343,8 +376,8 @@ namespace Algorithms
             for (int i = 0; i < sameParamsIntervals.Count(); i++)
             {
                 var kv = sameParamsIntervals.ElementAt(i);
-                double[][] convA = tempParameters.convexHulls[kv.Key].Amatrix.ToJagged();
-                double[] convB = tempParameters.convexHulls[kv.Key].Bvector;
+                double[][] convA = CurrentIntervalsParameters.convexHulls[kv.Key].Amatrix.ToJagged();
+                double[] convB = CurrentIntervalsParameters.convexHulls[kv.Key].Bvector;
                 int constrNum = convB.Count();
                 
                 for (int j = 0; j < constrNum; j ++)
@@ -354,7 +387,7 @@ namespace Algorithms
                     left = left.Multiply(-1.0);
                     double right = - convB[j];
 
-                    if (j >= tempParameters.convexHulls[kv.Key].EqNumber)
+                    if (j >= CurrentIntervalsParameters.convexHulls[kv.Key].EqNumber)
                     {
                         constraintsA.Add(left);
                         constraintsB.Add(right);
@@ -857,6 +890,11 @@ namespace Algorithms
         public Tuple<List<double[]>, List<int>> GetSchedule(List<Tuple<double[], int[]>> volumes)
         {
             return DecomposeVolumes(volumes.Select(x => new Tuple<double[], int[]>(RemoveOutputElement(x.Item1), x.Item2)).ToList());
+        }
+
+        public List<double[]> AddOutputComponent(List<double[]> schedule)
+        {
+            return schedule.Select(x => AddOutputElement(x)).ToList();
         }
 
         #endregion

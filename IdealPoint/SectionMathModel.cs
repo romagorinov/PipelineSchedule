@@ -123,6 +123,11 @@ namespace Algorithms
             return new Tuple<List<double[]>, List<int>>(result.Item1.Select(x => new double[] { x }).ToList(), result.Item2);
         }
 
+        public List<double[]> AddOutputComponent(List<double[]> schedule)
+        {
+            return schedule.Select(x => new double[] { x[0], x[0] }).ToList();
+        }
+
         #endregion
     }
 

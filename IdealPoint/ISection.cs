@@ -9,5 +9,6 @@ namespace Algorithms
     public interface ISection
     {
         Tuple<List<double[]>, List<int>> GetSchedule(List<Tuple<double[], int[]>> volumes);
+        List<double[]> AddOutputComponent(List<double[]> schedule);
     }
 }

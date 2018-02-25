@@ -416,26 +416,25 @@ namespace IdealPointWPF
 
             var tu3Interval = Accord.Math.Vector.EnumerableRange(12 * 24, 19 * 24).ToArray();
             var interval = Accord.Math.Vector.EnumerableRange(0, p.Period).ToArray();
-            var targets = new Dictionary<string, List<Tuple<double[], int[]>>>()
-            {
-                {"ТУ0", new List<Tuple<double[], int[]>>() {
-                    new Tuple<double[], int[]>(new double[] { 1584.27 }, interval) } },
-                {"ТУ1", new List<Tuple<double[], int[]>>() {
-                    new Tuple<double[], int[]>(new double[] { 1586.6, 221.6, /*9.8*/ 14, 1586.6 + 221.6 + 14 }, interval) } },
-                {"ТУ2", new List<Tuple<double[], int[]>>() {
-                    new Tuple<double[], int[]>(new double[] { 1650.0 }, interval) } },
-                {"ТУ3", new List<Tuple<double[], int[]>>() {
-                    new Tuple<double[], int[]>(new double[] { 350, 15.0, 350 - 15.0 }, tu3Interval),
-                    new Tuple<double[], int[]>(new double[] { 1640 - 350, 0, 1640 - 350}, interval.Except(tu3Interval).ToArray()) } },
-                {"Труба откачка У НПЗ", new List<Tuple<double[], int[]>>() {
-                    new Tuple<double[], int[]>(new double[] { 269.0 }, interval) } },
-                {"Труба подкачка ГНПС 2", new List<Tuple<double[], int[]>>() {
-                    new Tuple<double[], int[]>(new double[] { 162.847 }, interval) } }
-            };
+            PipelineSystem.PumpsParameters targets = new PipelineSystem.PumpsParameters(new List<string> { "ТУ0", "ТУ1", "ТУ2", "ТУ3", "Труба откачка У НПЗ", "Труба подкачка ГНПС 2" });
+            targets.SetUniformity("ТУ0", true);
+            targets.SetUniformity("Труба откачка У НПЗ", true);
+            targets.SetUniformity("Труба подкачка ГНПС 2", true);
+            targets.AddBatch("ТУ0", new double[] { 1584.27 }, interval);
+            targets.AddBatch("ТУ1", new double[] { 1586.6, 221.6, 15, 1586.6 + 221.6 + 14 }, interval);
+            targets.AddBatch("ТУ2", new double[] { 1650.0 }, interval);
+            targets.AddBatch("ТУ3", new double[] { 350, 15.0, 350 - 15.0 }, tu3Interval);
+            targets.AddBatch("ТУ3", new double[] { 1640 - 350, 0, 1640 - 350 }, interval.Except(tu3Interval).ToArray());
+            targets.AddBatch("Труба откачка У НПЗ", new double[] { 269.0 }, interval);
+            targets.AddBatch("Труба подкачка ГНПС 2", new double[] { 162.847 }, interval);
+
+            var reservoir2Pumps = Algorithms.AlgorithmHelper.CreateListOfElements(p.Period, (-targets.batches["Труба откачка У НПЗ"][0].Item1[0] + targets.batches["Труба подкачка ГНПС 2"][0].Item1[0]) / p.Period).ToArray();
 
             var tankersStartVolume = new double[] { 12.8, 30.6, 17.7 };
 
+            DateTime time = DateTime.Now;
             Dictionary<string, List<double[]>> tuSchedules = p.Algorithm(targets, tankersStartVolume);
+            MessageBox.Show((DateTime.Now - time).TotalSeconds.ToString());
 
             if (tuSchedules == null)
                 return;
@@ -443,7 +442,7 @@ namespace IdealPointWPF
             double[] zeros = new double[p.Period];
 
             SetPlots(
-                zeros,
+                Algorithms.AlgorithmHelper.CreateListOfElements(p.Period, targets.batches["ТУ0"][0].Item1[0] / p.Period).ToArray(),
                 tuSchedules["ТУ1"].Select(x => x[0]).ToArray(),
                 tuSchedules["ТУ1"].Select(x => x[1]).ToArray(),
                 tuSchedules["ТУ1"].Select(x => x[2]).ToArray(),
@@ -452,11 +451,11 @@ namespace IdealPointWPF
                 tuSchedules["ТУ3"].Select(x => x[0]).ToArray(),
                 tuSchedules["ТУ3"].Select(x => x[1]).ToArray(),
                 tuSchedules["ТУ3"].Select(x => x[2]).ToArray(),
-                0,
-                0,
-                0,
+                tankersStartVolume[0],
+                tankersStartVolume[1],
+                tankersStartVolume[2],
                 zeros,
-                zeros,
+                reservoir2Pumps,
                 zeros);
             
         }
