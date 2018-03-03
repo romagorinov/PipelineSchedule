@@ -1,15 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
-using System.Collections.Concurrent;
 using Accord.Math;
-using GeneticSharp;
-using GeneticSharp.Domain.Fitnesses;
-using GeneticSharp.Domain.Chromosomes;
-using GeneticSharp.Domain.Mutations;
 using Accord.Math.Optimization;
-using System.Threading;
 
 namespace Algorithms
 {
@@ -36,10 +29,16 @@ namespace Algorithms
         #endregion
 
         #region Расчетные
-        
-        Tuple<double, double[]> _normCoefficients;
+
+        public IntervalsParameters _currentIntervalsParameters;
 
         public Error err = new Error() { errorNumber = 1, msg = "Расчетов не производилось" };
+
+        private RepairMathModel _notRepair;
+
+        List<int> _reapirDayIntervals;
+
+        List<Tuple<HashSet<RegimeMathModel>, ConvexHull>> _combinationsConvex;
 
         #endregion
 
@@ -55,32 +54,22 @@ namespace Algorithms
                 _weights = value ?? AlgorithmHelper.CreateListOfElements(_pumpsCount + 1, 1.0).ToArray();
             }
         }
+        
+        public int Dimension => _pumpsCount + 1;
 
-        public double[] UpperBound
+        public List<List<int>> ControlAvaliableIntervals
         {
-            get;
-            set;
-        }
-
-        public double[] LowerBound
-        {
-            get;
-            set;
-        }
-
-        private int[] DefaultIndexes => _repairs.Select((x, i) => i).ToArray();
-
-        public IntervalsParameters CurrentIntervalsParameters
-        {
-            get;
-            set;
+            get
+            {
+                return _currentIntervalsParameters.uniformityIntervals;
+            }
         }
 
         #endregion
 
         #region Конструкторы
 
-        public SectionWithPumpsMathModel(List<Tuple<double, double[][]>> regimes, double[] pumpSigns, List<Tuple<double, double[], double>> maxFlows, double[] weights = null, bool inZeroAvaliable = false, bool[] pumpsZeroAvaliable = null)
+        public SectionWithPumpsMathModel(List<Tuple<double, double[][]>> regimes, double[] pumpSigns, List<Tuple<double, double[], double>> maxFlows, double[] weights = null)
         {
             _period = maxFlows.Count();
             _pumpsCount = pumpSigns.Count();
@@ -108,6 +97,10 @@ namespace Algorithms
                 }
             }
 
+            List<RepairMathModel> distinctRepairs = _repairs.Distinct().ToList();
+            List<int> repCount = distinctRepairs.Select(repair => _repairs.Count(x => x == repair)).ToList();
+            _notRepair = distinctRepairs[repCount.IndexOf(repCount.Max())];
+
             // Отыщем нормирующие коэффициенты
             Helpers.Pair<double, double[]> maxPair = new Helpers.Pair<double, double[]>(double.NegativeInfinity, pumpSigns.Select(x => double.NegativeInfinity).ToArray());
             for (int i = 0; i < regimes.Count(); i++)
@@ -117,11 +110,28 @@ namespace Algorithms
 
                 maxPair.Item2 = maxPair.Item2.Zip(regimes[i].Item2, (x, y) => x > y[1] ? x : y[1]).ToArray();
             }
-            _normCoefficients = new Tuple<double, double[]>(maxPair.Item1, maxPair.Item2);
             
             Weights = weights;
-            UpperBound = Convert(1.0, _pumpsSigns.Select(x => 1.01).ToArray());
-            LowerBound = Convert(1.0, _pumpsSigns.Select(x => 0.99).ToArray());
+
+            HashSet<int> repairDays = new HashSet<int>();
+            for (int i = 0; i < _period; i++)
+            {
+                int day = i / 24;
+                if (_repairs[i] != _notRepair)
+                    repairDays.Add(day);
+            }
+
+            _reapirDayIntervals = new List<int>();
+            foreach (var day in repairDays.ToList())
+                for (int hour = 0; hour < 24; hour++)
+                    _reapirDayIntervals.Add(day * 24 + hour);
+
+            _combinationsConvex = new List<Tuple<HashSet<RegimeMathModel>, ConvexHull>>();
+            foreach (var regimesCombination in Combinatorics.Combinations(_regimes.ToArray(), Dimension + 1))
+            {
+                var list = regimesCombination.ToList();
+                _combinationsConvex.Add(new Tuple<HashSet<RegimeMathModel>, ConvexHull>(new HashSet<RegimeMathModel>(list), GetConvex(list, _notRepair)));
+            }
         }
 
         #endregion
@@ -147,25 +157,9 @@ namespace Algorithms
             public Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>> sameParamsIntervals;
             public Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, ConvexHull> convexHulls;
             public Dictionary<int, ConvexHull> convexHullOnIntervals;
+            public List<List<int>> uniformityIntervals;
 
             public IntervalsParameters() { }
-
-            public bool IsValid(SectionWithPumpsMathModel model)
-            {
-                if (avaliableRegimesOnIntervals == null
-                    || sameParamsIntervals == null
-                    || convexHulls == null
-                    || convexHullOnIntervals == null)
-                    return false;
-
-                for(int i = 0; i < model._period; i++)
-                {
-                    if (!avaliableRegimesOnIntervals.ContainsKey(i) || !convexHullOnIntervals.ContainsKey(i) || !sameParamsIntervals.Any(kv => kv.Value.Contains(i)))
-                        return false;
-                }
-
-                return true;
-            }
         }
 
         #endregion
@@ -173,87 +167,10 @@ namespace Algorithms
         #region Методы
 
         #region Служебные функции
-        
-        public void CalcDefaultIntervalsParameters(List<Tuple<double[], int[]>> volumes)
-        {
-            var temp = volumes.SelectMany(x => x.Item2);
-            if (temp.Count() != temp.Distinct().Count())
-                throw new Exception();
-
-            // Предрасчеты
-            Dictionary<int, HashSet<RegimeMathModel>> avaliableRegimesOnIntervals = new Dictionary<int, HashSet<RegimeMathModel>>();
-            foreach (var tuple in volumes)
-            {
-                var volumeIn = tuple.Item1[0];
-                var volumePump = Convert(tuple.Item1).Item2;
-                var indexes = tuple.Item2.ToList();
-
-                // Нулевой режим
-                if (volumeIn == 0.0)
-                {
-                    indexes.ForEach(idx => avaliableRegimesOnIntervals.Add(idx, new HashSet<RegimeMathModel>() { _regimes.First(regime => regime.Gin == 0.0) }));
-                }
-                else
-                {
-                    foreach (var idx in indexes)
-                    {
-                        var repair = _repairs[idx];
-
-                        // Допустимы по ремонтам, обязательно
-                        var canUseRegimes = _regimes.Where(regime => regime.CanUse(repair));
-
-                        if (canUseRegimes.Count() == 0)
-                            throw new Exception();
-
-                        // Не качаем, когда не нужно, на подкачки, обязательно
-                        canUseRegimes = canUseRegimes.Where(regime => !volumePump.Zip(regime.GpumpMin, (x, y) => x == 0 && y != 0).Any(x => x));
-
-                        // Убираем нулевой режим
-                        var technologyRegimes = canUseRegimes.Where(regime => regime.Gin != 0);
-
-                        if (technologyRegimes.Count() == 0)
-                            technologyRegimes = canUseRegimes;
-
-                        // Качаем на подкачки, когда нужно
-                        var needUseRegimes = technologyRegimes.Where(regime => !regime.GpumpMax.Zip(volumePump, (x, y) => x == 0 && y != 0).Any(x => x));
-
-                        if (needUseRegimes.Count() == 0)
-                            needUseRegimes = technologyRegimes;
-
-                        avaliableRegimesOnIntervals.Add(idx, new HashSet<RegimeMathModel>(needUseRegimes));
-                    }
-                }
-            }
-
-            Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>> sameParamsIntervals = new Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>>();
-            foreach (var kv in avaliableRegimesOnIntervals)
-            {
-                var idx = kv.Key;
-                var hashSet = kv.Value;
-                var repair = _repairs[idx];
-                var existentKey = sameParamsIntervals.Keys.FirstOrDefault(x => x.Item1.SetEquals(hashSet) && x.Item2 == repair);
-
-                if (existentKey == null)
-                    sameParamsIntervals.Add(new Tuple<HashSet<RegimeMathModel>, RepairMathModel>(hashSet, repair), new List<int>() { idx });
-                else
-                    sameParamsIntervals[existentKey].Add(idx);
-            }
-
-            Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, ConvexHull> convexHulls = sameParamsIntervals
-                .Select(x => new { KEY = x.Key, VALUE = GetConvex(x.Key.Item1.ToList(), x.Key.Item2) })
-                .ToDictionary(x => x.KEY, x => x.VALUE);
-
-            Dictionary<int, ConvexHull> convexHullOnIntervals = new Dictionary<int, ConvexHull>();
-            foreach (var kv in sameParamsIntervals)
-                foreach (var idx in kv.Value)
-                    convexHullOnIntervals.Add(idx, convexHulls[kv.Key]);
-
-            CurrentIntervalsParameters = new IntervalsParameters() { avaliableRegimesOnIntervals = avaliableRegimesOnIntervals, convexHullOnIntervals = convexHullOnIntervals, convexHulls = convexHulls, sameParamsIntervals = sameParamsIntervals };
-        }
 
         private Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>> GetSameParamsIntervals(int[] indexes)
         {
-            return CurrentIntervalsParameters.sameParamsIntervals
+            return _currentIntervalsParameters.sameParamsIntervals
                 .ToDictionary(x => x.Key, x => x.Value.Where(y => indexes.Contains(y)).ToList())
                 .Where(kv => kv.Value.Count() > 0)
                 .ToDictionary(kv => kv.Key, kv => kv.Value);
@@ -302,16 +219,13 @@ namespace Algorithms
 
         #region Функции для расчетов 
         
-        public Tuple<List<double[]>, List<int>> DecomposeVolumes(List<Tuple<double[], int[]>> volumes)
+        public List<Tuple<List<double[]>, List<int>>> DecomposeVolumes(List<Tuple<double[], int[]>> volumes)
         {
             var temp = volumes.SelectMany(x => x.Item2);
             if (temp.Count() != temp.Distinct().Count())
                 throw new Exception();
 
-            if (CurrentIntervalsParameters == null)
-                CalcDefaultIntervalsParameters(volumes);
-
-            Tuple<List<double[]>, List<int>> result = new Tuple<List<double[]>, List<int>>(new List<double[]>(), new List<int>());
+            List<Tuple<List<double[]>, List<int>>> result = new List<Tuple<List<double[]>, List<int>>>();
             foreach(var tuple in volumes)
             {
                 var volume = Convert(tuple.Item1);
@@ -331,8 +245,23 @@ namespace Algorithms
                     return null;
                 }
 
-                result.Item1.AddRange(discreteSchedule);
-                result.Item2.AddRange(indexes);
+                var res = new List<Tuple<List<double[]>, List<int>>>() { new Tuple<List<double[]>, List<int>>(new List<double[]>(), new List<int>()) };
+
+                for (int i = 0; i < indexes.Count(); i++)
+                {
+                    int idx = indexes[i];
+                    if (_repairs[idx] != _notRepair)
+                    {
+                        res.Add(new Tuple<List<double[]>, List<int>>(new List<double[]>() { discreteSchedule[i] }, new List<int>() { idx }));
+                    }
+                    else
+                    {
+                        res[0].Item1.Add(discreteSchedule[i]);
+                        res[0].Item2.Add(idx);
+                    }
+                }
+
+                result.AddRange(res);
             }
 
             err = new Error() { errorNumber = 0, msg = "Расчет произведен без ошибок." };
@@ -376,8 +305,8 @@ namespace Algorithms
             for (int i = 0; i < sameParamsIntervals.Count(); i++)
             {
                 var kv = sameParamsIntervals.ElementAt(i);
-                double[][] convA = CurrentIntervalsParameters.convexHulls[kv.Key].Amatrix.ToJagged();
-                double[] convB = CurrentIntervalsParameters.convexHulls[kv.Key].Bvector;
+                double[][] convA = _currentIntervalsParameters.convexHulls[kv.Key].Amatrix.ToJagged();
+                double[] convB = _currentIntervalsParameters.convexHulls[kv.Key].Bvector;
                 int constrNum = convB.Count();
                 
                 for (int j = 0; j < constrNum; j ++)
@@ -387,7 +316,7 @@ namespace Algorithms
                     left = left.Multiply(-1.0);
                     double right = - convB[j];
 
-                    if (j >= CurrentIntervalsParameters.convexHulls[kv.Key].EqNumber)
+                    if (j >= _currentIntervalsParameters.convexHulls[kv.Key].EqNumber)
                     {
                         constraintsA.Add(left);
                         constraintsB.Add(right);
@@ -490,27 +419,25 @@ namespace Algorithms
                 }
                 else
                 {
-                    var regimesCombinations = Combinatorics.Combinations(sameParamsIntervals[i].Key.Item1.ToArray(), _pumpsCount + 2).ToList();
-                    RegimeMathModel targetRegime = new RegimeMathModel(sumOnCurrentInterval[0] / currentPeriod, new double[_pumpsCount], new double[_pumpsCount], new double[_pumpsCount]);
-                    regimesCombinations = regimesCombinations.Where(combination =>
+                    var allAvalRegimes = sameParamsIntervals[i].Key.Item1;
+                    double[] targetPoint = Convert(inVolume, pumpsVolume).Select(x => x / currentPeriod).ToArray();
+                    var regimesCombinations = _combinationsConvex.Where(combination =>
                     {
-                        bool upper = false, lower = false;
-                        double t = Round(targetRegime.Gin);
-                        foreach (var regime in combination)
+                        var combinationHash = combination.Item1;
+                        if (allAvalRegimes.IsSupersetOf(combinationHash))
                         {
-                            double r = Round(regime.Gin);
-                            if (r < t)
-                                lower = true;
-                            else if (r > t)
-                                upper = true;
+                            if (combination.Item2.IsPointInConvexHull(targetPoint))
+                                return true;
                             else
-                                lower = upper = true;
+                                return false;
                         }
-                        return lower && upper;
+                        else
+                            return false;
                     }).ToList();
+                    RegimeMathModel targetRegime = new RegimeMathModel(sumOnCurrentInterval[0] / currentPeriod, new double[_pumpsCount], new double[_pumpsCount], new double[_pumpsCount]);
                     regimesCombinations.Sort((el1, el2) =>
                     {
-                        double val1 = GetCombinationPreference(el1, targetRegime), val2 = GetCombinationPreference(el2, targetRegime);
+                        double val1 = GetCombinationPreference(el1.Item1.ToArray(), targetRegime), val2 = GetCombinationPreference(el2.Item1.ToArray(), targetRegime);
                         if (val1 > val2)
                             return 1;
                         else if (val1 < val2)
@@ -518,20 +445,12 @@ namespace Algorithms
                         else
                             return 0;
                     });
-                    int counter = 0;
-                    CancellationTokenSource tokenSource = new CancellationTokenSource();
-                    CancellationToken token = tokenSource.Token;
-                    Parallel.ForEach(regimesCombinations, (combination, state) =>
+                    foreach(var combination in regimesCombinations)
                     {
-                        var curRes = Decompose(sumOnCurrentInterval.Select(x => Round(x)).ToArray(), combination, currentIndexes.Count(), sameParamsIntervals[i].Key.Item2, token);
-                        Interlocked.Increment(ref counter);
-                        if (curRes != null)
-                        {                            
-                            res = curRes;
-                            state.Stop();
-                            tokenSource.Cancel();
-                        }
-                    });
+                        res = Decompose(sumOnCurrentInterval.Select(x => Round(x)).ToArray(), combination.Item1.ToArray(), currentIndexes.Count(), sameParamsIntervals[i].Key.Item2);
+                        if (res != null)
+                            break;
+                    }
                     if (res == null)
                         return null;
                 }
@@ -556,7 +475,7 @@ namespace Algorithms
             return schedule;
         }
 
-        private List<Tuple<double[], int>> Decompose(double[] volumes, RegimeMathModel[] regimes, int period, RepairMathModel repair, CancellationToken token)
+        private List<Tuple<double[], int>> Decompose(double[] volumes, RegimeMathModel[] regimes, int period, RepairMathModel repair)
         {
             Tuple<double, double[]> volumesPair = Convert(volumes);
             double[] avgPumps = volumesPair.Item2.Select(x => x / period).ToArray();
@@ -771,9 +690,7 @@ namespace Algorithms
             constraints.AddRange(linearConstraints);
 
             var solver = new AugmentedLagrangian(f, constraints);
-
-            solver.Token = token;
-
+            
             // Выберем точку где-то в середине
             solver.Minimize(new double[varCount]);
 
@@ -883,18 +800,108 @@ namespace Algorithms
             return Math.Round(val, DIGITS);
         }
 
-        #endregion
-
-        #region Реализация интерфейсов
-        
-        public Tuple<List<double[]>, List<int>> GetSchedule(List<Tuple<double[], int[]>> volumes)
-        {
-            return DecomposeVolumes(volumes.Select(x => new Tuple<double[], int[]>(RemoveOutputElement(x.Item1), x.Item2)).ToList());
-        }
-
         public List<double[]> AddOutputComponent(List<double[]> schedule)
         {
             return schedule.Select(x => AddOutputElement(x)).ToList();
+        }
+
+        #endregion
+
+        #region Реализация интерфейсов
+
+        public void CalcDefaultIntervalsParameters(List<Tuple<double[], int[]>> volumes)
+        {
+            var temp = volumes.SelectMany(x => x.Item2);
+            if (temp.Count() != temp.Distinct().Count())
+                throw new Exception();
+
+            // Предрасчеты
+            Dictionary<int, HashSet<RegimeMathModel>> avaliableRegimesOnIntervals = new Dictionary<int, HashSet<RegimeMathModel>>();
+            foreach (var tuple in volumes)
+            {
+                var volumeIn = tuple.Item1[0];
+                var volumePump = Convert(tuple.Item1).Item2;
+                var indexes = tuple.Item2.ToList();
+
+                // Нулевой режим
+                if (volumeIn == 0.0)
+                {
+                    indexes.ForEach(idx => avaliableRegimesOnIntervals.Add(idx, new HashSet<RegimeMathModel>() { _regimes.First(regime => regime.Gin == 0.0) }));
+                }
+                else
+                {
+                    foreach (var idx in indexes)
+                    {
+                        var repair = _repairs[idx];
+
+                        // Допустимы по ремонтам, обязательно
+                        var canUseRegimes = _regimes.Where(regime => regime.CanUse(repair));
+
+                        if (canUseRegimes.Count() == 0)
+                            throw new Exception();
+
+                        // Не качаем, когда не нужно, на подкачки, обязательно
+                        canUseRegimes = canUseRegimes.Where(regime => !volumePump.Zip(regime.GpumpMin, (x, y) => x == 0 && y != 0).Any(x => x));
+
+                        // Убираем нулевой режим
+                        var technologyRegimes = canUseRegimes.Where(regime => regime.Gin != 0);
+
+                        if (technologyRegimes.Count() == 0)
+                            technologyRegimes = canUseRegimes;
+
+                        // Качаем на подкачки, когда нужно
+                        var needUseRegimes = technologyRegimes.Where(regime => !regime.GpumpMax.Zip(volumePump, (x, y) => x == 0 && y != 0).Any(x => x));
+
+                        if (needUseRegimes.Count() == 0)
+                            needUseRegimes = technologyRegimes;
+
+                        avaliableRegimesOnIntervals.Add(idx, new HashSet<RegimeMathModel>(needUseRegimes));
+                    }
+                }
+            }
+
+            Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>> sameParamsIntervals = new Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>>();
+            foreach (var kv in avaliableRegimesOnIntervals)
+            {
+                var idx = kv.Key;
+                var hashSet = kv.Value;
+                var repair = _repairs[idx];
+                var existentKey = sameParamsIntervals.Keys.FirstOrDefault(x => x.Item1.SetEquals(hashSet) && x.Item2 == repair);
+
+                if (existentKey == null)
+                    sameParamsIntervals.Add(new Tuple<HashSet<RegimeMathModel>, RepairMathModel>(hashSet, repair), new List<int>() { idx });
+                else
+                    sameParamsIntervals[existentKey].Add(idx);
+            }
+
+            Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, ConvexHull> convexHulls = sameParamsIntervals
+                .Select(x => new { KEY = x.Key, VALUE = GetConvex(x.Key.Item1.ToList(), x.Key.Item2) })
+                .ToDictionary(x => x.KEY, x => x.VALUE);
+
+            Dictionary<int, ConvexHull> convexHullOnIntervals = new Dictionary<int, ConvexHull>();
+            foreach (var kv in sameParamsIntervals)
+                foreach (var idx in kv.Value)
+                    convexHullOnIntervals.Add(idx, convexHulls[kv.Key]);
+
+            _currentIntervalsParameters = new IntervalsParameters()
+            {
+                avaliableRegimesOnIntervals = avaliableRegimesOnIntervals,
+                convexHullOnIntervals = convexHullOnIntervals,
+                convexHulls = convexHulls,
+                sameParamsIntervals = sameParamsIntervals,
+                uniformityIntervals = volumes.Select(kv => kv.Item2.Where(x => _repairs[x] == _notRepair).ToList()).ToList()
+            };
+            _currentIntervalsParameters.uniformityIntervals.ForEach(x => x.Sort());
+        }
+
+        public List<Tuple<List<double[]>, List<int>>> GetSchedule(List<Tuple<double[], int[]>> volumes)
+        {
+            return DecomposeVolumes(volumes);
+        }
+
+        public List<double[]> GetFullSchedule(List<double[]> schedule)
+        {
+            return AddOutputComponent(schedule);
         }
 
         #endregion

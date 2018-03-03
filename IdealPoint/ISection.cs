@@ -1,14 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Algorithms
 {
     public interface ISection
     {
-        Tuple<List<double[]>, List<int>> GetSchedule(List<Tuple<double[], int[]>> volumes);
-        List<double[]> AddOutputComponent(List<double[]> schedule);
+        List<Tuple<List<double[]>, List<int>>> GetSchedule(List<Tuple<double[], int[]>> volumes);        
+
+        int Dimension
+        {
+            get;
+        }
+
+        List<List<int>> ControlAvaliableIntervals
+        {
+            get;
+        }
+
+        void CalcDefaultIntervalsParameters(List<Tuple<double[], int[]>> volumes);
+
+        List<double[]> GetFullSchedule(List<double[]> schedule);
     }
 }

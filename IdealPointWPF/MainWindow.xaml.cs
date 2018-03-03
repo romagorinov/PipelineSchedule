@@ -434,15 +434,16 @@ namespace IdealPointWPF
 
             DateTime time = DateTime.Now;
             Dictionary<string, List<double[]>> tuSchedules = p.Algorithm(targets, tankersStartVolume);
-            MessageBox.Show((DateTime.Now - time).TotalSeconds.ToString());
+            //MessageBox.Show((DateTime.Now - time).TotalSeconds.ToString());
 
             if (tuSchedules == null)
                 return;
 
             double[] zeros = new double[p.Period];
+            double[] inputSchedule = Algorithms.AlgorithmHelper.CreateListOfElements(p.Period, targets.batches["ТУ0"][0].Item1[0] / p.Period).ToArray();
 
             SetPlots(
-                Algorithms.AlgorithmHelper.CreateListOfElements(p.Period, targets.batches["ТУ0"][0].Item1[0] / p.Period).ToArray(),
+                inputSchedule,
                 tuSchedules["ТУ1"].Select(x => x[0]).ToArray(),
                 tuSchedules["ТУ1"].Select(x => x[1]).ToArray(),
                 tuSchedules["ТУ1"].Select(x => x[2]).ToArray(),

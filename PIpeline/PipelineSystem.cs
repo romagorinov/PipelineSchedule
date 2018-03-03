@@ -1,15 +1,10 @@
 ﻿using Algorithms;
 using Pipeline.Needles;
 using Pipeline.PipelineObjects;
-using Spire.Xls;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Accord.Math;
-using System.Threading;
 using System.Windows;
 
 namespace Pipeline
@@ -76,7 +71,7 @@ namespace Pipeline
             DiscreteSchedule tu1MainRepairs = new DiscreteSchedule(Period, bigMaxflowValue);
             tu1MainRepairs.FillInterval(61.5 / 24, 10 * 24 + 12, 10 * 24 + 13);
             tu1MainRepairs.FillInterval(46.1 / 24, 11 * 24 + 12, 11 * 24 + 16);
-            tu1MainRepairs.FillInterval(0, 11 * 24 + 12, 11 * 24 + 24);
+            // tu1MainRepairs.FillInterval(0, 11 * 24 + 12, 11 * 24 + 24);
             tu1MainRepairs.FillInterval(61.5 / 24, 12 * 24 + 12, 12 * 24 + 14);
             tu1MainRepairs.FillInterval(53.5 / 24, 17 * 24 + 12, 17 * 24 + 16);
             tu1MainRepairs.FillInterval(46.1 / 24, 18 * 24 + 12, 18 * 24 + 14);
@@ -352,44 +347,36 @@ namespace Pipeline
                 }
             }
 
-            Func<Tuple<List<double[]>, List<int>>, List<double[]>> Convert = (Tuple<List<double[]>, List<int>> tuple) =>
-            {
-                var arr = tuple.Item1.ToArray();
-                Array.Sort(tuple.Item2.ToArray(), arr);
-                return arr.ToList();
-            };
-
-            var initialSchedules = new Dictionary<string, List<double[]>>();
+            var initialSolutions = new Dictionary<string, List<Tuple<List<double[]>, List<int>>>>();
             var tuMathModels = new Dictionary<string, ISection>();
             foreach(var target in targets.batches)
             {
                 var tuMathModel = CreateSectionMathModel(target.Key);
                 if (tuMathModel != null)
                 {
+                    tuMathModel.CalcDefaultIntervalsParameters(target.Value);
                     tuMathModels.Add(target.Key, tuMathModel);
-                    var schedule = tuMathModel.GetSchedule(target.Value);
-                    if (schedule == null)
+                    var initialSolution = tuMathModel.GetSchedule(tuMathModel.GetType() == typeof(SectionWithPumpsMathModel) ? target.Value.Select(x => new Tuple<double[], int[]>(SectionWithPumpsMathModel.RemoveOutputElement(x.Item1),x.Item2)).ToList() : target.Value);
+                    if (initialSolution == null)
                     {
                         MessageBox.Show($"Ошибка исходных данных. По {target.Key} нельзя перекачать заданные объемы");
                         return null;
                     }
                     else
                     {
-                        var convertScheudule = Convert(schedule);
-                        if (tuMathModel.GetType() == typeof(SectionWithPumpsMathModel))
-                        {
-                            convertScheudule = convertScheudule.Select(x => (tuMathModel as SectionWithPumpsMathModel).AddOutputElement(x)).ToList();
-                        }
-                        initialSchedules.Add(target.Key, convertScheudule);
+                        initialSolutions.Add(target.Key, initialSolution);
                     }
                 }
             }
+                        
+            var rp1MathModel = new ReservoirBalancerMathModel(tankers[0].Volume, tankersStartVolume[0], null, tuMathModels["ТУ1"], Period);
+            rp1MathModel.SetTempParams(null, initialSolutions["ТУ1"], AlgorithmHelper.CreateListOfElements(Period, targets.batches["ТУ0"][0].Item1[0] / Period), 0.0, tankers[0].Volume);
+            var tuple = rp1MathModel.Balance();
 
-            var r1MathModel = new ReservoirSectionMathModel(tankers[0].Volume, tankersStartVolume[0], null, tuMathModels["ТУ1"]);
-            r1MathModel.SetTempParams(null, initialSchedules["ТУ1"], AlgorithmHelper.CreateListOfElements(Period, targets.batches["ТУ0"][0].Item1[0] / Period));
+            var result = targets.uniformity.Where(kv => !kv.Value).ToDictionary(kv => kv.Key, kv => AlgorithmHelper.CreateListOfArrays(Period, tuMathModels[kv.Key].Dimension + 1, 0.0));
+            result["ТУ1"] = (tuMathModels["ТУ1"] as SectionWithPumpsMathModel).AddOutputComponent(tuple.Item2);
 
-
-            return initialSchedules;
+            return result;
         }
 
         #endregion
