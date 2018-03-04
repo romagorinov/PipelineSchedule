@@ -459,7 +459,8 @@ namespace Algorithms
             int maxIter = 10;
             while (maxIter-- > 0)
             {
-                ConcurrentBag<Tuple<List<int>, List<int>>> variantList = new ConcurrentBag<Tuple<List<int>, List<int>>>();
+                bool hasSolution = false;
+                ConcurrentBag<Tuple<List<int>, List<int>, int>> variantList = new ConcurrentBag<Tuple<List<int>, List<int>, int>>();
                 foreach (var intervals in _outputSection.ControlAvaliableIntervals)
                 {
                     int intervalCount = intervals.Count();
@@ -486,7 +487,6 @@ namespace Algorithms
                         .Where(x => x != null)
                         .ToList();
 
-                    bool hasSolution = false;
                     Parallel.ForEach(checkIndexes, (indexes) =>
                     {
                         var block1 = intervals.GetRange(indexes[0], blockSize).ToList();
@@ -499,19 +499,39 @@ namespace Algorithms
                             newSchedule[block2[k]] = outputInitialSchedule[block1[k]];
                         }
 
-                        List<double> newReservoirSchedule = GetReservoirSchedule(inputInitialSchedule, newSchedule);
-                        List<int> newCrashIndexes = GetCrashIndexes(newReservoirSchedule);
-                        if (newCrashIndexes.Count() == 0)
+                        double currentReservoirLevel = _oilStartVolume;
+                        double currentOverFillLevel = 0.0;
+                        int currentCrashIndexesCount = 0;
+                        int currentChangesCount = 0;
+                        double currentChangesVolume = 0.0;
+                        for (int i = 0; i < _period; i++)
+                        {
+                            currentReservoirLevel += -newSchedule[i][0] + _tempPumpSchedule[i];
+                            if (currentReservoirLevel > _reservoirVolume || currentReservoirLevel < 0)
+                            {
+                                currentOverFillLevel += currentReservoirLevel > _reservoirVolume ? currentReservoirLevel - _reservoirVolume : -currentReservoirLevel;
+                                currentCrashIndexesCount++;
+                            }
+                            if (i > 0 && newSchedule[i-1][0] != newSchedule[i][0])
+                            {
+                                currentChangesCount++;
+                                currentChangesVolume += Math.Abs(newSchedule[i - 1][0] - newSchedule[i][0]);
+                            }
+                        }
+
+                        if (currentCrashIndexesCount == 0)
                             hasSolution = true;
 
-                        if (newCrashIndexes.Count() < crashIndexes.Count())
-                            if (hasSolution )
-                            variantList.Add(new Tuple<List<int>, List<int>>(block1, block2));
+                        if (currentOverFillLevel < prevOverfillLevel)
+                            variantList.Add(new Tuple<List<int>, List<int>, int>(block1, block2, newCrashIndexes.Count()));
                     });
                 };
 
                 if (variantList.Count() == 0)
                     return new Tuple<List<double[]>, List<double[]>>(inputInitialSchedule, outputInitialSchedule);
+
+                if (hasSolution)
+                    variantList = new ConcurrentBag<Tuple<List<int>, List<int>, int>>(variantList.Where(x => x.Item3 == 0));
 
                 var selected = variantList.ToList()[AlgorithmHelper.RandomInstance.Next(0, variantList.Count())];
                 List<double[]> newSchedule1 = outputInitialSchedule.Select(x => x).ToList();
