@@ -433,7 +433,7 @@ namespace IdealPointWPF
             var tankersStartVolume = new double[] { 12.8, 30.6, 17.7 };
 
             DateTime time = DateTime.Now;
-            Dictionary<string, List<double[]>> tuSchedules = p.Algorithm(targets, tankersStartVolume);
+            Dictionary<string, List<double[]>> tuSchedules = p.Algorithm(targets, tankersStartVolume, (str) => SetWinTitle(str));
             //MessageBox.Show((DateTime.Now - time).TotalSeconds.ToString());
 
             if (tuSchedules == null)

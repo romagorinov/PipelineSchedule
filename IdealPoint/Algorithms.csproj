@@ -97,7 +97,7 @@
     <Compile Include="ISection.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RegimeMathModel.cs" />
-    <Compile Include="ReservoirMathModel.cs" />
+    <Compile Include="SectionsSeqBalancerMathModel.cs" />
     <Compile Include="SectionWithPumpsMathModel.cs" />
     <Compile Include="RepairMathModel.cs" />
     <Compile Include="SectionMathModel.cs" />

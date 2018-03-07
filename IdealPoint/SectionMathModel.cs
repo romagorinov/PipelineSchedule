@@ -11,9 +11,10 @@ namespace Algorithms
         
         #region Не расчетные
 
-        private List<double> _regimes;
-        private List<double> _repairs;
+        List<double> _regimes;
+        List<double> _repairs;
         int _period;
+        double _maxError;
 
         #endregion
 
@@ -22,8 +23,6 @@ namespace Algorithms
         List<List<double>> _avaliableRegimesOnIntervals;
 
         double _notRepair;
-
-        List<int> _reapirDayIntervals;
 
         #endregion
 
@@ -35,8 +34,14 @@ namespace Algorithms
 
         public double MaxError
         {
-            get;
-            set;
+            get => _maxError;
+            set
+            {
+                if (value <= 0)
+                    _maxError = 0.001;
+                else
+                    _maxError = value;
+            }
         }
 
         public List<List<int>> ControlAvaliableIntervals
@@ -45,16 +50,28 @@ namespace Algorithms
             private set;
         }
 
+        public int Period => _period;
+
         #endregion
 
         #region Конструкторы
 
         public SectionMathModel(List<double> regimes, List<double> maxFlows)
         {
-            if (regimes == null || maxFlows == null)
-                throw new ArgumentNullException();
+            if (regimes == null)
+                throw new Exception();
+            if (maxFlows == null)
+                throw new Exception();
+            if (regimes.Count() == 0)
+                throw new Exception();
+            if (maxFlows.Count() == 0)
+                throw new Exception();
+            if (regimes.Any(x => x < 0))
+                throw new Exception();
+            if (maxFlows.Any(x => x < 0))
+                throw new Exception();
 
-            _regimes = regimes.Select(x => x).ToList();
+            _regimes = regimes.Select(x => x).Distinct().ToList();
             _regimes.Sort();
 
             _repairs = maxFlows.Select(x => x).ToList();
@@ -62,20 +79,7 @@ namespace Algorithms
             _notRepair = _repairs.Max();
 
             _period = maxFlows.Count();
-
-            HashSet<int> repairDays = new HashSet<int>();
-            for (int i =  0; i < _period; i++)
-            {
-                int day = i / 24;
-                if (_repairs[i] != _notRepair)
-                    repairDays.Add(day);
-            }
-
-            _reapirDayIntervals = new List<int>();
-            foreach (var day in repairDays.ToList())
-                for (int hour = 0; hour < 24; hour++)
-                    _reapirDayIntervals.Add(day * 24 + hour);
-
+            
             MaxError = 0.001;
         }
 
@@ -83,9 +87,50 @@ namespace Algorithms
 
         #region Методы
 
+        #region Проверки 
+
+        void CheckVolumes(List<Tuple<double[], int[]>> volumes)
+        {
+            if (volumes == null)
+                throw new Exception();
+            if (volumes.Count() == 0)
+                throw new Exception();
+            if (volumes.Any(x => x == null))
+                throw new Exception();
+            if (volumes.Any(x => x.Item1 == null))
+                throw new Exception();
+            if (volumes.Any(x => x.Item2 == null))
+                throw new Exception();
+            if (volumes.Any(x => x.Item1.Count() != Dimension))
+                throw new Exception();
+            if (volumes.Any(x => x.Item1.Any(y => y < 0)))
+                throw new Exception();
+            if (volumes.Any(x => x.Item2.Any(y => y < 0 || y > _period - 1)))
+                throw new Exception();
+            if (volumes.SelectMany(x => x.Item2).GroupBy(x => x).Any(x => x.Count() > 1))
+                throw new Exception();
+
+        }
+
+        void CheckSchedule(List<double[]> schedule)
+        {
+            if (schedule == null)
+                throw new Exception();
+            if (schedule.Count() == 0)
+                throw new Exception();
+            if (schedule.Any(x => x == null))
+                throw new Exception();
+            if (schedule.Any(x => x.Count() != Dimension))
+                throw new Exception();
+            if (schedule.Any(x => x.Any(y => y < 0)))
+                throw new Exception();
+        }
+
+        #endregion
+
         #region Функции для расчетов
 
-        public List<Tuple<List<double>, List<int>>> DecomposeVolumes(List<Tuple<double, int[]>> volumes)
+        private List<Tuple<List<double>, List<int>>> DecomposeVolumes(List<Tuple<double, int[]>> volumes)
         {
             List<Tuple<List<double>, List<int>>> result = new List<Tuple<List<double>, List<int>>>();
             
@@ -120,7 +165,7 @@ namespace Algorithms
             return result;
         }
 
-        public List<double> GetDiscreteSchedule(double volume, int[] indexes)
+        private List<double> GetDiscreteSchedule(double volume, int[] indexes)
         {
             int period = indexes.Count();
             List<double> result = new double[period].ToList();
@@ -169,6 +214,7 @@ namespace Algorithms
 
         public List<Tuple<List<double[]>, List<int>>> GetSchedule(List<Tuple<double[], int[]>> volumes)
         {
+            CheckVolumes(volumes);
             var convert = volumes.Select(x => new Tuple<double, int[]>(x.Item1[0], x.Item2)).ToList();
             var result = DecomposeVolumes(convert);
             if (result == null)
@@ -179,9 +225,7 @@ namespace Algorithms
 
         public void CalcDefaultIntervalsParameters(List<Tuple<double[], int[]>> volumes)
         {
-            var temp = volumes.SelectMany(x => x.Item2);
-            if (temp.Count() != temp.Distinct().Count())
-                throw new Exception();
+            CheckVolumes(volumes);
 
             _avaliableRegimesOnIntervals = new List<double>[_period].ToList();
             ControlAvaliableIntervals = new List<List<int>>();
@@ -193,19 +237,19 @@ namespace Algorithms
 
                 if (volume == 0.0)
                     for (int i = 0; i < indexes.Count(); i++)
-                        _avaliableRegimesOnIntervals[i] = new List<double> { 0.0 };
+                        _avaliableRegimesOnIntervals[indexes[i]] = new List<double> { 0.0 };
                 else
                     for (int i = 0; i < indexes.Count(); i++)
                     {
-                        _avaliableRegimesOnIntervals[i] = _regimes.Where(regime => regime <= _repairs[i]).ToList();
+                        _avaliableRegimesOnIntervals[indexes[i]] = _regimes.Where(regime => regime <= _repairs[indexes[i]]).ToList();
 
-                        if (_avaliableRegimesOnIntervals[i].Count() == 0)
+                        if (_avaliableRegimesOnIntervals[indexes[i]].Count() == 0)
                             throw new Exception();
 
-                        if (_avaliableRegimesOnIntervals[i].Count() > 1)
+                        if (_avaliableRegimesOnIntervals[indexes[i]].Count() > 1)
                         {
-                            _avaliableRegimesOnIntervals[i].Remove(0.0);
-                            _avaliableRegimesOnIntervals[i].Sort();
+                            _avaliableRegimesOnIntervals[indexes[i]].Remove(0.0);
+                            _avaliableRegimesOnIntervals[indexes[i]].Sort();
                         }
                     }
 
@@ -216,6 +260,13 @@ namespace Algorithms
 
         public List<double[]> GetFullSchedule(List<double[]> schedule)
         {
+            CheckSchedule(schedule);
+            return schedule;
+        }
+
+        public List<double[]> GetShortSchedule(List<double[]> schedule)
+        {
+            CheckSchedule(schedule);
             return schedule;
         }
 
