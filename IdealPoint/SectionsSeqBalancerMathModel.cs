@@ -25,6 +25,7 @@ namespace Algorithms
         int _resCount;
 
         List<List<Tuple<List<double[]>, List<int>>>> _tempSolutions;
+        List<TargetVolumes> _tempTargetVolumes;
         List<List<double>> _tempPumpSchedules;
 
         #endregion
@@ -363,7 +364,7 @@ namespace Algorithms
 
         #region Методы
 
-        public void SetTempParams(List<List<Tuple<List<double[]>, List<int>>>> tempSolutions, List<List<double>> tempPumpSchedules)
+        public void SetTempParams(List<TargetVolumes> tempTargetVolumes, List<List<double>> tempPumpSchedules)
         {
             if (tempPumpSchedules == null)
                 throw new Exception();
@@ -373,7 +374,16 @@ namespace Algorithms
                 throw new Exception();
             if (tempPumpSchedules.Any(x => x.Count() != _period))
                 throw new Exception();
-            if (tempSolutions == null)
+            if (tempTargetVolumes == null)
+                throw new Exception();
+            else if (tempTargetVolumes.Count() != _sections.Count())
+                throw new Exception();
+            for (int i = 0; i < _sections.Count(); i++)
+                if (_sections[i] != null && tempTargetVolumes[i] == null)
+                    throw new Exception();
+                else if (tempTargetVolumes[i] != null)
+                    tempTargetVolumes[i].Check(_sections[i].Dimension);
+            /*if (tempSolutions == null)
                 throw new Exception();
             if (tempSolutions.Count() != _sections.Count())
                 throw new Exception();
@@ -406,11 +416,11 @@ namespace Algorithms
                     throw new Exception();
                 if (tempSolution.SelectMany(x => x.Item2).GroupBy(x => x).Any(x => x.Count() > 1))
                         throw new Exception();
-            }
+            }*/
 
             _tempPumpSchedules = tempPumpSchedules.Select(x => x.ToList()).ToList();
-            
-            _tempSolutions = tempSolutions.Select(x => x == null ? null : x.Select(y => new Tuple<List<double[]>, List<int>>(y.Item1.ToList(), y.Item2.ToList())).ToList()).ToList();
+            _tempTargetVolumes = tempTargetVolumes.ToList();
+            _tempSolutions = null;
         }
         
         private static List<double[]> CreateInitialSchedule(List<Tuple<List<double[]>, List<int>>> initialSolution)
@@ -494,6 +504,9 @@ namespace Algorithms
             if (informationAction == null)
                 informationAction = (str) => { };
 
+            if (_tempSolutions == null)
+                Analyse();
+
             bool BREAKER = false;
 
             List<List<double[]>> initialSchedules = _tempSolutions.Select((x,i) =>
@@ -507,9 +520,9 @@ namespace Algorithms
             Func<List<List<double[]>>> convertResult = () =>
             {
                 if (_sections[0] == null)
-                    initialSchedules.Remove(initialSchedules[0]);
+                    initialSchedules.RemoveAt(0);
                 else if (_sections.Last() == null)
-                    initialSchedules.Remove(initialSchedules.Last());
+                    initialSchedules.RemoveAt(initialSchedules.Count() - 1);
                 return initialSchedules;
             };
 
@@ -751,6 +764,18 @@ namespace Algorithms
             }
 
             return result;
+        }
+
+        private void Analyse()
+        {
+            List<List<List<int>>> sectionsStopIndexes = _sections.Select(x => x == null ? new List<List<int>>() : x.StopIndexes).ToList();
+            int sectionNumber = sectionsStopIndexes.FindIndex(x => x.Count() != 0);
+            List<List<int>> stopIndexes = sectionsStopIndexes[sectionNumber];
+
+            int stopInterval = stopIndexes[0][0],
+                stopLength = stopIndexes[0].Count();
+
+
         }
 
         #endregion

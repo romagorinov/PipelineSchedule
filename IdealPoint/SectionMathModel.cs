@@ -52,6 +52,12 @@ namespace Algorithms
 
         public int Period => _period;
 
+        public List<List<int>> StopIndexes
+        {
+            get;
+            private set;
+        }
+
         #endregion
 
         #region Конструкторы
@@ -89,27 +95,11 @@ namespace Algorithms
 
         #region Проверки 
 
-        void CheckVolumes(List<Tuple<double[], int[]>> volumes)
+        void CheckVolumes(TargetVolumes volumes)
         {
             if (volumes == null)
                 throw new Exception();
-            if (volumes.Count() == 0)
-                throw new Exception();
-            if (volumes.Any(x => x == null))
-                throw new Exception();
-            if (volumes.Any(x => x.Item1 == null))
-                throw new Exception();
-            if (volumes.Any(x => x.Item2 == null))
-                throw new Exception();
-            if (volumes.Any(x => x.Item1.Count() != Dimension))
-                throw new Exception();
-            if (volumes.Any(x => x.Item1.Any(y => y < 0)))
-                throw new Exception();
-            if (volumes.Any(x => x.Item2.Any(y => y < 0 || y > _period - 1)))
-                throw new Exception();
-            if (volumes.SelectMany(x => x.Item2).GroupBy(x => x).Any(x => x.Count() > 1))
-                throw new Exception();
-
+            volumes.Check(Dimension);
         }
 
         void CheckSchedule(List<double[]> schedule)
@@ -130,17 +120,17 @@ namespace Algorithms
 
         #region Функции для расчетов
 
-        private List<Tuple<List<double>, List<int>>> DecomposeVolumes(List<Tuple<double, int[]>> volumes)
+        private List<Tuple<List<double>, List<int>>> DecomposeVolumes(TargetVolumes volumes)
         {
             List<Tuple<List<double>, List<int>>> result = new List<Tuple<List<double>, List<int>>>();
             
-            foreach(var tuple in volumes)
+            foreach(var tuple in volumes.targetVolumes)
             {
                 var indexes = tuple.Item2;
                 var volume = tuple.Item1;
-                var schedule = GetDiscreteSchedule(volume, indexes);
-                double maxDif = volume * MaxError;
-                if (Math.Abs(schedule.Sum() - volume) > maxDif)
+                var schedule = GetDiscreteSchedule(volume[0], indexes);
+                double maxDif = volume[0] * MaxError;
+                if (Math.Abs(schedule.Sum() - volume[0]) > maxDif)
                     return null;
 
                 var res = new List<Tuple<List<double>, List<int>>>() { new Tuple<List<double>, List<int>>(new List<double>(), new List<int>()) };
@@ -165,7 +155,7 @@ namespace Algorithms
             return result;
         }
 
-        private List<double> GetDiscreteSchedule(double volume, int[] indexes)
+        private List<double> GetDiscreteSchedule(double volume, List<int> indexes)
         {
             int period = indexes.Count();
             List<double> result = new double[period].ToList();
@@ -212,27 +202,26 @@ namespace Algorithms
 
         #region Реализация интерфейсов
 
-        public List<Tuple<List<double[]>, List<int>>> GetSchedule(List<Tuple<double[], int[]>> volumes)
+        public List<Tuple<List<double[]>, List<int>>> GetSchedule(TargetVolumes volumes)
         {
             CheckVolumes(volumes);
-            var convert = volumes.Select(x => new Tuple<double, int[]>(x.Item1[0], x.Item2)).ToList();
-            var result = DecomposeVolumes(convert);
+            var result = DecomposeVolumes(volumes);
             if (result == null)
                 return null;
             else
                 return result.Select(x => new Tuple<List<double[]>, List<int>>(x.Item1.Select(y => new double[] { y }).ToList(), x.Item2)).ToList();
         }
 
-        public void CalcDefaultIntervalsParameters(List<Tuple<double[], int[]>> volumes)
+        public void CalcDefaultIntervalsParameters(TargetVolumes volumes)
         {
             CheckVolumes(volumes);
 
             _avaliableRegimesOnIntervals = new List<double>[_period].ToList();
             ControlAvaliableIntervals = new List<List<int>>();
 
-            foreach(var tuple in volumes)
+            foreach(var tuple in volumes.targetVolumes)
             {
-                int[] indexes = tuple.Item2;
+                List<int> indexes = tuple.Item2;
                 double volume = tuple.Item1[0];
 
                 if (volume == 0.0)
@@ -256,6 +245,31 @@ namespace Algorithms
                 ControlAvaliableIntervals.Add(indexes.Where(x => _repairs[x] == _notRepair).ToList());
                 ControlAvaliableIntervals.Last().Sort();
             }
+
+            StopIndexes = new List<List<int>>();
+            bool currentStop = false;
+            List<int> stopIndexes = null;
+            for (int i = 0; i < Period; i++)
+            {
+                if (_repairs[i] == 0.0)
+                {
+                    if (!currentStop)
+                    {
+                        stopIndexes = new List<int>() { i };
+                        currentStop = true;
+                    }
+                    else
+                        stopIndexes.Add(i);
+                }
+                else if (currentStop == true)
+                {
+                    StopIndexes.Add(stopIndexes);
+                    currentStop = false;
+                    stopIndexes = null;
+                }
+            }
+            if (stopIndexes != null)
+                StopIndexes.Add(stopIndexes);
         }
 
         public List<double[]> GetFullSchedule(List<double[]> schedule)

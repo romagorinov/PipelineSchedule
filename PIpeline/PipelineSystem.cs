@@ -71,8 +71,8 @@ namespace Pipeline
             DiscreteSchedule tu1MainRepairs = new DiscreteSchedule(Period, bigMaxflowValue);
             tu1MainRepairs.FillInterval(61.5 / 24, 10 * 24 + 12, 10 * 24 + 13);
             tu1MainRepairs.FillInterval(46.1 / 24, 11 * 24 + 12, 11 * 24 + 16);
-            //tu1MainRepairs.FillInterval(0, 11 * 24 + 12, 11 * 24 + 84);
-            tu1MainRepairs.FillInterval(61.5 / 24, 12 * 24 + 12, 12 * 24 + 14);
+            tu1MainRepairs.FillInterval(0, 11 * 24 + 12, 11 * 24 + 86);
+            //tu1MainRepairs.FillInterval(61.5 / 24, 12 * 24 + 12, 12 * 24 + 14);
             tu1MainRepairs.FillInterval(53.5 / 24, 17 * 24 + 12, 17 * 24 + 16);
             tu1MainRepairs.FillInterval(46.1 / 24, 18 * 24 + 12, 18 * 24 + 14);
             tu1MainRepairs.FillInterval(46.1 / 24, 26 * 24 + 12, 26 * 24 + 14);
@@ -349,19 +349,15 @@ namespace Pipeline
 
             var initialSolutions = new Dictionary<string, List<Tuple<List<double[]>, List<int>>>>();
             var tuMathModels = new Dictionary<string, ISection>();
+            var targetVolumes = new List<TargetVolumes>();
             foreach(var target in targets.batches)
             {
                 var tuMathModel = CreateSectionMathModel(target.Key);
                 if (tuMathModel != null)
                 {
-                    List<Tuple<double[], int[]>> curTarget;
-                    if (tuMathModel.GetType() == typeof(SectionMathModel))
-                        curTarget = target.Value;
-                    else
-                    {
-                        curTarget = target.Value.Select(x => new Tuple<double[], int[]>(SectionWithPumpsMathModel.RemoveOutputElement(x.Item1), x.Item2)).ToList();
-                    }
-
+                    TargetVolumes curTarget = new TargetVolumes(Period, tuMathModel.Dimension);
+                    targetVolumes.Add(curTarget);
+                    target.Value.ForEach(x => curTarget.AddVolume(x.Item1, x.Item2.ToList()));
                     tuMathModel.CalcDefaultIntervalsParameters(curTarget);
                     tuMathModels.Add(target.Key, tuMathModel);
                     var initialSolution = tuMathModel.GetSchedule(curTarget);
@@ -377,14 +373,9 @@ namespace Pipeline
                 }
             }
 
-            /*var rp1MathModel = new SectionsSeqBalancerMathModel(tankers[0].Volume, tankersStartVolume[0], null, tuMathModels["ТУ1"], Period);
-            rp1MathModel.SetTempParams(null, initialSolutions["ТУ1"], AlgorithmHelper.CreateListOfElements(Period, targets.batches["ТУ0"][0].Item1[0] / Period), 0.0, tankers[0].Volume);
-            var tuple = rp1MathModel.Balance(informationAction);*/
-
             var balancerMathModel = new SectionsSeqBalancerMathModel(tankers.Select(x => x.Volume).ToList(), tankersStartVolume.ToList(), new List<ISection>() { null }.Concat(tuMathModels.Values).ToList(), Period);
-            var solutionsToBalancer = initialSolutions.Values.ToList();
-            solutionsToBalancer.Insert(0, null);
-            balancerMathModel.SetTempParams(solutionsToBalancer, new List<List<double>>()
+            targetVolumes.Insert(0, null);
+            balancerMathModel.SetTempParams(targetVolumes, new List<List<double>>()
             {
                 AlgorithmHelper.CreateListOfElements(Period, targets.batches["ТУ0"][0].Item1[0] / Period),
                 AlgorithmHelper.CreateListOfElements(Period, (-targets.batches["Труба откачка У НПЗ"][0].Item1[0] + targets.batches["Труба подкачка ГНПС 2"][0].Item1[0]) / Period),

@@ -101,6 +101,7 @@
     <Compile Include="SectionWithPumpsMathModel.cs" />
     <Compile Include="RepairMathModel.cs" />
     <Compile Include="SectionMathModel.cs" />
+    <Compile Include="TargetVolumes.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

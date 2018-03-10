@@ -22,13 +22,18 @@ namespace Algorithms
             get;
         }
 
+        List<List<int>> StopIndexes
+        {
+            get;
+        }
+
         #endregion
 
         #region Методы
 
-        List<Tuple<List<double[]>, List<int>>> GetSchedule(List<Tuple<double[], int[]>> volumes);
+        List<Tuple<List<double[]>, List<int>>> GetSchedule(TargetVolumes volumes);
 
-        void CalcDefaultIntervalsParameters(List<Tuple<double[], int[]>> volumes);
+        void CalcDefaultIntervalsParameters(TargetVolumes volumes);
 
         List<double[]> GetFullSchedule(List<double[]> schedule);
 

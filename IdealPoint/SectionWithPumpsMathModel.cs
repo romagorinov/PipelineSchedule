@@ -59,6 +59,12 @@ namespace Algorithms
 
         public int Period => _period;
 
+        public List<int> StopIndexes => _repairs
+            .Select((x, i) => new { VAL = x, IDX = i })
+            .Where(x => x.VAL.MaxInput == 0.0)
+            .Select(x => x.IDX)
+            .ToList();
+
         #endregion
 
         #region Конструкторы
@@ -183,7 +189,7 @@ namespace Algorithms
 
         #region Служебные функции
 
-        private Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>> GetSameParamsIntervals(int[] indexes)
+        private Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>> GetSameParamsIntervals(List<int> indexes)
         {
             return _currentIntervalsParameters.sameParamsIntervals
                 .ToDictionary(x => x.Key, x => x.Value.Where(y => indexes.Contains(y)).ToList())
@@ -234,27 +240,11 @@ namespace Algorithms
 
         #region Проверки 
 
-        void CheckVolumes(List<Tuple<double[], int[]>> volumes)
+        void CheckVolumes(TargetVolumes volumes)
         {
             if (volumes == null)
                 throw new Exception();
-            if (volumes.Count() == 0)
-                throw new Exception();
-            if (volumes.Any(x => x == null))
-                throw new Exception();
-            if (volumes.Any(x => x.Item1 == null))
-                throw new Exception();
-            if (volumes.Any(x => x.Item2 == null))
-                throw new Exception();
-            if (volumes.Any(x => x.Item1.Count() != Dimension))
-                throw new Exception();
-            if (volumes.Any(x => x.Item1.Any(y => y < 0)))
-                throw new Exception();
-            if (volumes.Any(x => x.Item2.Any(y => y < 0 || y > _period - 1)))
-                throw new Exception();
-            if (volumes.SelectMany(x => x.Item2).GroupBy(x => x).Any(x => x.Count() > 1))
-                throw new Exception();
-
+            volumes.Check(Dimension);
         }
 
         void CheckSchedule(List<double[]> schedule, int dim)
@@ -275,10 +265,10 @@ namespace Algorithms
 
         #region Функции для расчетов 
 
-        private List<Tuple<List<double[]>, List<int>>> DecomposeVolumes(List<Tuple<double[], int[]>> volumes)
+        private List<Tuple<List<double[]>, List<int>>> DecomposeVolumes(TargetVolumes volumes)
         {
             List<Tuple<List<double[]>, List<int>>> result = new List<Tuple<List<double[]>, List<int>>>();
-            foreach(var tuple in volumes)
+            foreach(var tuple in volumes.targetVolumes)
             {
                 var volume = Convert(tuple.Item1);
                 var indexes = tuple.Item2;
@@ -320,7 +310,7 @@ namespace Algorithms
             return result;
         }
         
-        private List<double[]> GetContinuousSchedule(double inVolume, double[] pumpsVolume, int[] indexes)
+        private List<double[]> GetContinuousSchedule(double inVolume, double[] pumpsVolume, List<int> indexes)
         {
             int period = indexes.Count();
             var sameParamsIntervals = GetSameParamsIntervals(indexes);
@@ -413,7 +403,7 @@ namespace Algorithms
             return result;
         }
         
-        private List<double[]> GetDiscreteSchedule(double inVolume, double[] pumpsVolume, int[] indexes)
+        private List<double[]> GetDiscreteSchedule(double inVolume, double[] pumpsVolume, List<int> indexes)
         {
             int period = indexes.Count();
             var sameParamsIntervals = GetSameParamsIntervals(indexes).ToList();
@@ -435,7 +425,7 @@ namespace Algorithms
             for (int i = 0; i < sameParamsIntervals.Count(); i++)
             {
                 var repair = sameParamsIntervals[i].Key.Item2;
-                var continuousSchedule = GetContinuousSchedule(inVolume, pumpsVolume, indexesList.ToArray());
+                var continuousSchedule = GetContinuousSchedule(inVolume, pumpsVolume, indexesList);
                 if (continuousSchedule == null)
                     return null;
                 var currentIndexes = sameParamsIntervals[i].Value;
@@ -851,18 +841,24 @@ namespace Algorithms
             list.Add(list.GetRange(1, list.Count() - 1).Zip(_pumpsSigns, (x, y) => x * y).Sum() + list[0]);
             return list.ToArray();
         }
-        
+
         #endregion
 
         #region Реализация интерфейсов
 
-        public void CalcDefaultIntervalsParameters(List<Tuple<double[], int[]>> volumes)
+        public List<Tuple<List<double[]>, List<int>>> GetSchedule(TargetVolumes volumes)
+        {
+            CheckVolumes(volumes);
+            return DecomposeVolumes(volumes);
+        }
+
+        public void CalcDefaultIntervalsParameters(TargetVolumes volumes)
         {
             CheckVolumes(volumes);
 
             // Предрасчеты
             Dictionary<int, HashSet<RegimeMathModel>> avaliableRegimesOnIntervals = new Dictionary<int, HashSet<RegimeMathModel>>();
-            foreach (var tuple in volumes)
+            foreach (var tuple in volumes.targetVolumes)
             {
                 var volumeIn = tuple.Item1[0];
                 var volumePump = Convert(tuple.Item1).Item2;
@@ -934,15 +930,9 @@ namespace Algorithms
                 convexHullOnIntervals = convexHullOnIntervals,
                 convexHulls = convexHulls,
                 sameParamsIntervals = sameParamsIntervals,
-                uniformityIntervals = volumes.Select(kv => kv.Item2.Where(x => _repairs[x] == _notRepair).ToList()).ToList()
+                uniformityIntervals = volumes.targetVolumes.Select(kv => kv.Item2.Where(x => _repairs[x] == _notRepair).ToList()).ToList()
             };
             _currentIntervalsParameters.uniformityIntervals.ForEach(x => x.Sort());
-        }
-
-        public List<Tuple<List<double[]>, List<int>>> GetSchedule(List<Tuple<double[], int[]>> volumes)
-        {
-            CheckVolumes(volumes);
-            return DecomposeVolumes(volumes);
         }
 
         public List<double[]> GetFullSchedule(List<double[]> schedule)
