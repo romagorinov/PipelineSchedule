@@ -59,11 +59,11 @@ namespace Algorithms
 
         public int Period => _period;
 
-        public List<int> StopIndexes => _repairs
-            .Select((x, i) => new { VAL = x, IDX = i })
-            .Where(x => x.VAL.MaxInput == 0.0)
-            .Select(x => x.IDX)
-            .ToList();
+        public List<List<int>> StopIndexes
+        {
+            get;
+            private set;
+        }
 
         #endregion
 
@@ -153,6 +153,31 @@ namespace Algorithms
                 var list = regimesCombination.ToList();
                 _combinationsConvex.Add(new Tuple<HashSet<RegimeMathModel>, ConvexHull>(new HashSet<RegimeMathModel>(list), GetConvex(list, _notRepair)));
             }
+
+            StopIndexes = new List<List<int>>();
+            bool currentStop = false;
+            List<int> stopIndexes = null;
+            for (int i = 0; i < Period; i++)
+            {
+                if (_repairs[i].MaxInput == 0.0)
+                {
+                    if (!currentStop)
+                    {
+                        stopIndexes = new List<int>() { i };
+                        currentStop = true;
+                    }
+                    else
+                        stopIndexes.Add(i);
+                }
+                else if (currentStop == true)
+                {
+                    StopIndexes.Add(stopIndexes);
+                    currentStop = false;
+                    stopIndexes = null;
+                }
+            }
+            if (stopIndexes != null)
+                StopIndexes.Add(stopIndexes);
         }
 
         #endregion
@@ -292,7 +317,7 @@ namespace Algorithms
                 for (int i = 0; i < indexes.Count(); i++)
                 {
                     int idx = indexes[i];
-                    if (_repairs[idx] != _notRepair)
+                    if (_repairs[idx] != _notRepair || volumes.GetFix(idx) != null)
                     {
                         res.Add(new Tuple<List<double[]>, List<int>>(new List<double[]>() { discreteSchedule[i] }, new List<int>() { idx }));
                     }
@@ -421,7 +446,7 @@ namespace Algorithms
             
             List<double[]> schedule = new double[period][].ToList();
             pumpsVolume = pumpsVolume.Select(x => x).ToArray();
-            // На ремонты ставим один и тот же режим
+            // На неконтролируемые интервалы
             for (int i = 0; i < sameParamsIntervals.Count(); i++)
             {
                 var repair = sameParamsIntervals[i].Key.Item2;
@@ -899,6 +924,13 @@ namespace Algorithms
                         avaliableRegimesOnIntervals.Add(idx, new HashSet<RegimeMathModel>(needUseRegimes));
                     }
                 }
+
+                foreach (var idx in indexes)
+                {
+                    double[] fixVal = volumes.GetFix(idx);
+                    if (fixVal != null)
+                        avaliableRegimesOnIntervals[idx] = new HashSet<RegimeMathModel>(new List<RegimeMathModel> { _regimes.First(x => x.CanProvide(fixVal)) });
+                }
             }
 
             Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>> sameParamsIntervals = new Dictionary<Tuple<HashSet<RegimeMathModel>, RepairMathModel>, List<int>>();
@@ -930,7 +962,7 @@ namespace Algorithms
                 convexHullOnIntervals = convexHullOnIntervals,
                 convexHulls = convexHulls,
                 sameParamsIntervals = sameParamsIntervals,
-                uniformityIntervals = volumes.targetVolumes.Select(kv => kv.Item2.Where(x => _repairs[x] == _notRepair).ToList()).ToList()
+                uniformityIntervals = volumes.targetVolumes.Select(kv => kv.Item2.Where(x => _repairs[x] == _notRepair && volumes.GetFix(x) == null).ToList()).ToList()
             };
             _currentIntervalsParameters.uniformityIntervals.ForEach(x => x.Sort());
         }

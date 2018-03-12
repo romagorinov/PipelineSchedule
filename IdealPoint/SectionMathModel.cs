@@ -87,6 +87,31 @@ namespace Algorithms
             _period = maxFlows.Count();
             
             MaxError = 0.001;
+
+            StopIndexes = new List<List<int>>();
+            bool currentStop = false;
+            List<int> stopIndexes = null;
+            for (int i = 0; i < Period; i++)
+            {
+                if (_repairs[i] == 0.0)
+                {
+                    if (!currentStop)
+                    {
+                        stopIndexes = new List<int>() { i };
+                        currentStop = true;
+                    }
+                    else
+                        stopIndexes.Add(i);
+                }
+                else if (currentStop == true)
+                {
+                    StopIndexes.Add(stopIndexes);
+                    currentStop = false;
+                    stopIndexes = null;
+                }
+            }
+            if (stopIndexes != null)
+                StopIndexes.Add(stopIndexes);
         }
 
         #endregion
@@ -138,7 +163,7 @@ namespace Algorithms
                 for (int i = 0; i < indexes.Count(); i++)
                 {
                     int idx = indexes[i];
-                    if (_repairs[idx] != _notRepair)
+                    if (_repairs[idx] != _notRepair || volumes.GetFix(i) != null)
                     {
                         res.Add(new Tuple<List<double>, List<int>>(new List<double>() { schedule[i] }, new List<int>() { idx }));
                     }
@@ -241,46 +266,26 @@ namespace Algorithms
                             _avaliableRegimesOnIntervals[indexes[i]].Sort();
                         }
                     }
+                
+                foreach(var idx in indexes)
+                { 
+                    double[] fixVal = volumes.GetFix(idx);
+                    if (fixVal != null)
+                        _avaliableRegimesOnIntervals[idx] = new List<double> { fixVal[0] };
+                }
 
-                ControlAvaliableIntervals.Add(indexes.Where(x => _repairs[x] == _notRepair).ToList());
+                ControlAvaliableIntervals.Add(indexes.Where(x => _repairs[x] == _notRepair && volumes.GetFix(x) == null).ToList());
                 ControlAvaliableIntervals.Last().Sort();
             }
-
-            StopIndexes = new List<List<int>>();
-            bool currentStop = false;
-            List<int> stopIndexes = null;
-            for (int i = 0; i < Period; i++)
-            {
-                if (_repairs[i] == 0.0)
-                {
-                    if (!currentStop)
-                    {
-                        stopIndexes = new List<int>() { i };
-                        currentStop = true;
-                    }
-                    else
-                        stopIndexes.Add(i);
-                }
-                else if (currentStop == true)
-                {
-                    StopIndexes.Add(stopIndexes);
-                    currentStop = false;
-                    stopIndexes = null;
-                }
-            }
-            if (stopIndexes != null)
-                StopIndexes.Add(stopIndexes);
         }
 
         public List<double[]> GetFullSchedule(List<double[]> schedule)
         {
-            CheckSchedule(schedule);
             return schedule;
         }
 
         public List<double[]> GetShortSchedule(List<double[]> schedule)
         {
-            CheckSchedule(schedule);
             return schedule;
         }
 

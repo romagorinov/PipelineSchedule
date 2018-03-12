@@ -141,7 +141,29 @@ namespace Algorithms
 
             return true;
         }
-                
+        
+        public bool CanProvide(double[] G)
+        {
+            if (G == null)
+                throw new Exception();
+            if (G.Count() != _pumpsCount + 1)
+                throw new Exception();
+            if (G.Any(x => x < 0))
+                throw new Exception();
+
+            if (G[0] != Gin)
+                return false;
+
+            for (int i = 0; i < _pumpsCount; i++)
+            {
+                double providePump = G[i + 1];
+                if (providePump < GpumpMin[i] || providePump > GpumpMax[i])
+                    return false;
+            }
+
+            return true;
+        }
+        
         public double[] GetNearestPumpsPoit(double[] Gpumps, RepairMathModel repair, double[] pumpsPriority = null)
         {
             CheckRepair(repair);
