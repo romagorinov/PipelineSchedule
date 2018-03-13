@@ -476,6 +476,24 @@ namespace Algorithms
             return result;
         }
 
+        private double GetOverfillVolume(List<double> reservoirSchedule, double minVolume, double maxVolume)
+        {
+            double result = 0.0;
+            for (int i = 1; i < reservoirSchedule.Count(); i++)
+            {
+                var x = reservoirSchedule[i];
+                if (x < minVolume)
+                {
+                    result += minVolume - x;
+                }
+                else if (x > maxVolume)
+                {
+                    result += x - maxVolume;
+                }
+            }
+            return result;
+        }
+
         private void CreateTempSolution()
         {
             _tempSolutions = new List<List<Tuple<List<double[]>, List<int>>>>();
@@ -486,7 +504,7 @@ namespace Algorithms
                 {
                     var volume = _tempTargetVolumes[i];
                     section.CalcDefaultIntervalsParameters(volume);
-                    _tempSolutions.Add(section.GetSchedule(volume));
+                    _tempSolutions.Add(section.GetSolution(volume));
                 }
                 else
                 {
@@ -524,9 +542,7 @@ namespace Algorithms
                 informationAction = (str) => { };
 
             List<List<double[]>> initialSchedules = null;
-            List<List<double>> reservoirInitialSchedules = null;
-            List<List<int>> reservoirCrashIndexes = null;
-            List<double> prevOverfillVolumes = null;
+            List<double> prevOverfillVolumes = new List<double>();
 
             Func<List<List<double[]>>> ConvertResult = () =>
             {
@@ -536,7 +552,7 @@ namespace Algorithms
                     initialSchedules.RemoveAt(initialSchedules.Count() - 1);
                 return initialSchedules;
             };
-            Action CalcInitParams = () =>
+            Action CalcInitialSchedules = () =>
             {
                 initialSchedules = _tempSolutions.Select((x, i) =>
                 {
@@ -545,56 +561,66 @@ namespace Algorithms
                     else
                         return _sections[i].GetFullSchedule(CreateInitialSchedule(x));
                 }).ToList();
-                reservoirInitialSchedules = _reservoirVolumes.Select((x, i) => new List<double>() { _oilStartVolumes[i] }).ToList();
-                reservoirCrashIndexes = _reservoirVolumes.Select(x => new List<int>()).ToList();
-                prevOverfillVolumes = _reservoirVolumes.Select(x => 0.0).ToList();
-                for (int i = 0; i < _resCount; i++)
+            };
+            Action CalcOverfill = () =>
+            {
+                prevOverfillVolumes = new List<double>();
+                for (int i = 0; i < initialSchedules.Count() - 1; i++)
                 {
-                    List<double[]> inputSchedule = initialSchedules[i],
-                        outputSchedules = initialSchedules[i + 1];
-                    List<double> pumpSchedule = _tempPumpSchedules[i],
-                        reservoirSchedule = reservoirInitialSchedules[i];
-                    List<int> crashIndexes = reservoirCrashIndexes[i];
-                    double resVolume = _reservoirVolumes[i];
-                    for (int j = 0; j < _period; j++)
-                    {
-                        double val = reservoirSchedule.Last() + inputSchedule[j].Last() - outputSchedules[j].First() + pumpSchedule[j];
-                        if (val < 0)
-                        {
-                            crashIndexes.Add(j);
-                            prevOverfillVolumes[i] -= val;
-                        }
-                        if (val > resVolume)
-                        {
-                            crashIndexes.Add(j);
-                            prevOverfillVolumes[i] += val - resVolume;
-                        }
-                        reservoirSchedule.Add(val);
-                    }
+                    var reservoirSchedule = GetReservoirSchedule(initialSchedules[i], initialSchedules[i + 1], _tempPumpSchedules[i], _oilStartVolumes[i]);
+                    prevOverfillVolumes.Add(GetOverfillVolume(reservoirSchedule, 0, _reservoirVolumes[i]));
                 }
             };
 
             // Сначала без анализа
             CreateTempSolution();
-            CalcInitParams();
+            CalcInitialSchedules();
+            CalcOverfill();
             if (prevOverfillVolumes.All(x => x == 0.0))
             {
                 return ConvertResult();
             }
 
-            // Анализируем        
-            bool breaker = !Analyse();
-            CalcInitParams();
-            if (prevOverfillVolumes.All(x => x == 0.0) || breaker)
+            int maxIter = 1;
+            for (int i = 0; i < maxIter; i++)
             {
-                return ConvertResult();
+                initialSchedules = Permute(initialSchedules, 24, 100, informationAction);
+                CalcOverfill();
+                if (prevOverfillVolumes.All(x => x == 0.0))
+                {
+                    return ConvertResult();
+                }
+                bool breaker = !Analyse(initialSchedules);
+                if (breaker)
+                    break;
+                CalcInitialSchedules();
+                CalcOverfill();
+                if (prevOverfillVolumes.All(x => x == 0.0))
+                {
+                    return ConvertResult();
+                }
             }
-            
-            // Пробуем балансировать
-            int blockSize = 24;
-            int maxIter = 100;
+
+            if (initialSchedules == null)
+                return null;
+            else
+                return ConvertResult();
+        }
+        
+        private List<List<double[]>> Permute(List<List<double[]>> initialSchedules, int blockSize, int maxIter, Action<string> informationAction)
+        {
+            initialSchedules = initialSchedules.Select(x => x.Select(y => y.ToList().ToArray()).ToList()).ToList();
+            List<List<double>> reservoirInitialSchedules = new List<List<double>>();
+            List<List<int>> reservoirCrashIndexes = new List<List<int>>();
+            List<double> prevOverfillVolumes = new List<double>();
+            for (int i = 0; i < initialSchedules.Count() - 1; i++)
+            {
+                reservoirInitialSchedules.Add(GetReservoirSchedule(initialSchedules[i], initialSchedules[i + 1], _tempPumpSchedules[i], _oilStartVolumes[i]));
+                prevOverfillVolumes.Add(GetOverfillVolume(reservoirInitialSchedules.Last(), 0, _reservoirVolumes[i]));
+                reservoirCrashIndexes.Add(GetCrashIndexes(reservoirInitialSchedules.Last(), 0, _reservoirVolumes[i]));
+            }
+
             int curIter = 0;
-            List<List<double[]>> result = null;
             Func<int, TempBalanceStruct> GetInitStruct = (sectionNumber) =>
             {
                 var tempStruct = new TempBalanceStruct()
@@ -624,6 +650,7 @@ namespace Algorithms
                 }
                 return tempStruct;
             };
+            //bool[][] crashIndexesBool = reservoirCrashIndexes.Select((x, i) => new bool[_period].Select((y,j) => x.Contains(j)).ToArray()).ToArray();
             while (maxIter > curIter++)
             {
                 ConcurrentBag<TempBagStruct> variantBag = new ConcurrentBag<TempBagStruct>();
@@ -661,7 +688,7 @@ namespace Algorithms
                             })
                             .Where(x => x != null)
                             .ToList();
-
+                        
                         Parallel.ForEach(checkIndexes, (indexes) =>
                         {
                             var block1 = intervals.GetRange(indexes[0], blockSize).ToList();
@@ -680,17 +707,33 @@ namespace Algorithms
                             {
                                 currentStartReservoirVolume += -newSchedule[0].First() + tempStruct.startReservoirPumpsSchedule[0] + initialSchedules[sectionNumber - 1][0].Last();
                                 if (currentStartReservoirVolume > tempStruct.startReservoirVolume)
+                                {
                                     currentStartReservoirOverfillVolume += currentStartReservoirVolume - tempStruct.startReservoirVolume;
+                                    /*if (!crashIndexesBool[sectionNumber - 1][0])
+                                        return;*/
+                                }
                                 else if (currentStartReservoirVolume < 0)
+                                {
                                     currentStartReservoirOverfillVolume -= currentStartReservoirVolume;
+                                    /*if (!crashIndexesBool[sectionNumber - 1][0])
+                                        return;*/
+                                }
                             }
                             if (tempStruct.endReservoirSchedule != null)
                             {
                                 currentEndReservoirVolume += newSchedule[0].Last() + tempStruct.endReservoirPumpsSchedule[0] - initialSchedules[sectionNumber + 1][0].First();
                                 if (currentEndReservoirVolume > tempStruct.endReservoirVolume)
+                                {
                                     currentEndReservoirOverfillVolume += currentEndReservoirVolume - tempStruct.endReservoirVolume;
+                                    /*if (!crashIndexesBool[sectionNumber][0])
+                                        return;*/
+                                }
                                 else if (currentEndReservoirVolume < 0)
+                                {
                                     currentEndReservoirOverfillVolume -= currentEndReservoirVolume;
+                                    /*if (!crashIndexesBool[sectionNumber][0])
+                                        return;*/
+                                }
                             }
 
                             for (int i = 1; i < _period; i++)
@@ -699,17 +742,33 @@ namespace Algorithms
                                 {
                                     currentStartReservoirVolume += -newSchedule[i].First() + tempStruct.startReservoirPumpsSchedule[i] + initialSchedules[sectionNumber - 1][i].Last();
                                     if (currentStartReservoirVolume > tempStruct.startReservoirVolume)
+                                    {
                                         currentStartReservoirOverfillVolume += currentStartReservoirVolume - tempStruct.startReservoirVolume;
+                                        /*if (!crashIndexesBool[sectionNumber - 1][i])
+                                            return;*/
+                                    }
                                     else if (currentStartReservoirVolume < 0)
+                                    {
                                         currentStartReservoirOverfillVolume -= currentStartReservoirVolume;
+                                        /*if (!crashIndexesBool[sectionNumber - 1][i])
+                                            return;*/
+                                    }
                                 }
                                 if (tempStruct.endReservoirSchedule != null)
                                 {
                                     currentEndReservoirVolume += newSchedule[i].Last() + tempStruct.endReservoirPumpsSchedule[i] - initialSchedules[sectionNumber + 1][i].First();
                                     if (currentEndReservoirVolume > tempStruct.endReservoirVolume)
+                                    {
                                         currentEndReservoirOverfillVolume += currentEndReservoirVolume - tempStruct.endReservoirVolume;
+                                        /*if (!crashIndexesBool[sectionNumber][i])
+                                            return;*/
+                                    }
                                     else if (currentEndReservoirVolume < 0)
+                                    {
                                         currentEndReservoirOverfillVolume -= currentEndReservoirVolume;
+                                        /*if (!crashIndexesBool[sectionNumber][i])
+                                            return;*/
+                                    }
                                 }
 
                                 double a = newSchedule[i - 1][0], b = newSchedule[i][0];
@@ -782,66 +841,102 @@ namespace Algorithms
                 informationAction($"Итерация {curIter}, переполненность {prevOverfillVolumes.Sum()}");
                 if (prevOverfillVolumes.All(x => x == 0.0))
                 {
-                    result = ConvertResult();
-                    break;
+                    return initialSchedules;
                 }
+                //crashIndexesBool = reservoirCrashIndexes.Select((x, i) => new bool[_period].Select((y, j) => x.Contains(j)).ToArray()).ToArray();
             }
 
-            // Убрать потом
-            if (result == null)
-            {
-                result = ConvertResult();
-            }
-
-            return result;
+            return initialSchedules;
         }
-        
-        private bool Analyse()
-        {
-            List<List<List<int>>> sectionsStopIndexes = _sections.Select(x => x == null ? new List<List<int>>() : x.StopIndexes).ToList();
-            int minStopLen = 16;
 
-            if (sectionsStopIndexes.All(x => x.Count() == 0 || x.All(y => y.Count() < minStopLen)))
+        private bool Analyse(List<List<double[]>> initialSchedules)
+        {
+            List<List<double>> reservoirInitialSchedules = new List<List<double>>();
+            List<List<int>> reservoirCrashIndexes = new List<List<int>>();
+            List<double> prevOverfillVolumes = new List<double>();
+            for (int i = 0; i < initialSchedules.Count() - 1; i++)
             {
-                return true;
+                reservoirInitialSchedules.Add(GetReservoirSchedule(initialSchedules[i], initialSchedules[i + 1], _tempPumpSchedules[i], _oilStartVolumes[i]));
+                prevOverfillVolumes.Add(GetOverfillVolume(reservoirInitialSchedules.Last(), 0, _reservoirVolumes[i]));
+                reservoirCrashIndexes.Add(GetCrashIndexes(reservoirInitialSchedules.Last(), 0, _reservoirVolumes[i]));
             }
 
-            int sectionNumber = sectionsStopIndexes.FindIndex(x => x.Count() != 0);
-            List<List<int>> stopIndexes = sectionsStopIndexes[sectionNumber];
-            int stopInterval = stopIndexes[0][0],
-                stopLength = stopIndexes[0].Count();
-
-            if (sectionNumber > 0)
+            for (int i = 0; i < _sections.Count(); i++)
             {
-                double reservoirVolume = _reservoirVolumes[sectionNumber - 1],
-                    oilStartVolume = _oilStartVolumes[sectionNumber - 1];
-                List<double> reservoirPumps = _tempPumpSchedules[sectionNumber - 1];
-                ISection prevSection = _sections[sectionNumber - 1];
+                var section = _sections[i];
+                if (section == null)
+                    continue;
 
-                double pumpVolume = reservoirPumps.GetRange(stopInterval, stopLength).Sum();
-                if (prevSection == null)
+                var badStartRepairs = new List<List<int>>();
+                var badEndRepairs = new List<List<int>>();
+                for (int j = 0; j < section.RepairsIntervals.Count(); j++)
                 {
-                    if (pumpVolume > reservoirVolume)
+                    var repair = section.RepairsIntervals[j];
+                    int repairLen = repair.Count();
+                    int test = 0;
+                    if (i > 0)
                     {
-                        return false;
+                        // Смотрим изменения во входном резервуаре на данном участке
+                        double startVolume = reservoirInitialSchedules[i - 1][repair.First()],
+                            endVolume = reservoirInitialSchedules[i - 1][repair.Last() + 1];
+                        // Неконтролируемый скачек больше объема резервуара
+                        if (_sections[i - 1] == null && (endVolume - startVolume) > _reservoirVolumes[i - 1])
+                            return false;
+
+                        if (startVolume < 0 && endVolume > _reservoirVolumes[i - 1])
+                        {
+                            // Нужно на время ремонта уменьшить расход на предыдущей секции
+                            test = 0;
+                        }
+                        else if (startVolume > 0 && endVolume > _reservoirVolumes[i - 1])
+                        {
+                            // Нужно немного опорожнить резервуар
+                            test = 0;
+                        }
+                        else if (startVolume < 0 && endVolume < _reservoirVolumes[i - 1])
+                        {
+                            // Это странно....
+                            // Нужно немного наполнить резервуар
+                            test = 0;
+                        }
+                        else
+                        {
+                            // Этот ремонт не влияет ни на что
+                        }
                     }
-                    else
+
+                    if (i < _resCount)
                     {
-                        int controlStart = 0, controlStop = stopInterval;
-                        var currentVolumes = _tempTargetVolumes[sectionNumber];
-                        int batchToSplitIndex = currentVolumes.GetBiggestBatch(0, stopInterval);
-                        Tuple<double[], List<int>> batchToSplit = currentVolumes.targetVolumes[batchToSplitIndex];
-                        List<int> controlIndexes = batchToSplit.Item2.Where(x => x >= controlStart && x < controlStop).ToList();
-                        double coef = controlIndexes.Count() / batchToSplit.Item2.Count();
-                        double[] controlVolume = batchToSplit.Item1.Select(x => x * coef).ToArray();
-                        controlVolume[0] -= oilStartVolume * 0.96;
+                        // Смотрим изменения в выходном резервуаре на данном участке
+                        double startVolume = reservoirInitialSchedules[i][repair.First()],
+                            endVolume = reservoirInitialSchedules[i][repair.Last() + 1];
+                        // Неконтролируемый скачек больше объема резервуара
+                        if (_sections[i + 1] == null && (startVolume - endVolume) > _reservoirVolumes[i])
+                            return false;
+
+                        if (startVolume > _reservoirVolumes[i] && endVolume < 0)
+                        {
+                            // Нужно на время ремонта уменьшить расход на следующей секции
+                            test = 0;
+                        }
+                        else if (startVolume < _reservoirVolumes[i] && endVolume < 0)
+                        {
+                            // Нужно немного наполнить резервуар
+                            test = 0;
+                        }
+                        else if (startVolume > _reservoirVolumes[i] && endVolume > 0)
+                        {
+                            // Это странно....
+                            // Нужно немного опорожнить резервуар
+                            test = 0;
+                        }
+                        else
+                        {
+                            // Этот ремонт не влияет ни на что
+                        }
+
                     }
                 }
-                else
-                {
-
-                }
-
             }
 
             CreateTempSolution();

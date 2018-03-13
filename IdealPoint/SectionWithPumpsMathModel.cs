@@ -59,7 +59,7 @@ namespace Algorithms
 
         public int Period => _period;
 
-        public List<List<int>> StopIndexes
+        public List<List<int>> RepairsIntervals
         {
             get;
             private set;
@@ -154,30 +154,31 @@ namespace Algorithms
                 _combinationsConvex.Add(new Tuple<HashSet<RegimeMathModel>, ConvexHull>(new HashSet<RegimeMathModel>(list), GetConvex(list, _notRepair)));
             }
 
-            StopIndexes = new List<List<int>>();
-            bool currentStop = false;
-            List<int> stopIndexes = null;
+
+            RepairsIntervals = new List<List<int>>();
+            bool currentRepair = false;
+            List<int> repairIndexes = null;
             for (int i = 0; i < Period; i++)
             {
-                if (_repairs[i].MaxInput == 0.0)
+                if (_repairs[i] != _notRepair)
                 {
-                    if (!currentStop)
+                    if (!currentRepair)
                     {
-                        stopIndexes = new List<int>() { i };
-                        currentStop = true;
+                        repairIndexes = new List<int>() { i };
+                        currentRepair = true;
                     }
                     else
-                        stopIndexes.Add(i);
+                        repairIndexes.Add(i);
                 }
-                else if (currentStop == true)
+                else if (currentRepair == true)
                 {
-                    StopIndexes.Add(stopIndexes);
-                    currentStop = false;
-                    stopIndexes = null;
+                    RepairsIntervals.Add(repairIndexes);
+                    currentRepair = false;
+                    repairIndexes = null;
                 }
             }
-            if (stopIndexes != null)
-                StopIndexes.Add(stopIndexes);
+            if (repairIndexes != null)
+                RepairsIntervals.Add(repairIndexes);
         }
 
         #endregion
@@ -871,10 +872,29 @@ namespace Algorithms
 
         #region Реализация интерфейсов
 
-        public List<Tuple<List<double[]>, List<int>>> GetSchedule(TargetVolumes volumes)
+        public List<Tuple<List<double[]>, List<int>>> GetSolution(TargetVolumes volumes)
         {
             CheckVolumes(volumes);
             return DecomposeVolumes(volumes);
+        }
+
+        public List<double[]> GetContinuousSchedule(TargetVolumes volumes)
+        {
+            List<double[]> result = new double[Period][].ToList();
+
+            foreach (var tuple in volumes.targetVolumes)
+            {
+                var volume = Convert(tuple.Item1);
+                var indexes = tuple.Item2;
+
+                var continuousSchedule = GetContinuousSchedule(volume.Item1, volume.Item2, indexes);
+                for (int i = 0; i < indexes.Count(); i++)
+                {
+                    result[indexes[i]] = continuousSchedule[i];
+                }
+            }
+
+            return result;
         }
 
         public void CalcDefaultIntervalsParameters(TargetVolumes volumes)
@@ -977,6 +997,11 @@ namespace Algorithms
         {
             CheckSchedule(schedule, Dimension + 1);
             return schedule.Select(x => RemoveOutputElement(x)).ToList();
+        }
+
+        public RepairMathModel GetRepair(int interval)
+        {
+            return new RepairMathModel(_repairs[interval]);
         }
 
         #endregion

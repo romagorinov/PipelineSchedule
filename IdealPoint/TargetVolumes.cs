@@ -50,6 +50,7 @@ namespace Algorithms
             if (volume.Count() > dimension)
                 volume = volume.ToList().GetRange(0, dimension).ToArray();
 
+            indexes.Sort();
             targetVolumes.Add(new Tuple<double[], List<int>>(volume, indexes));
         }
 
@@ -104,10 +105,84 @@ namespace Algorithms
 
         public int GetBiggestBatch(int startIndex, int endIndex)
         {
+            if (startIndex < 0 || startIndex > period - 1 || endIndex < 1 || endIndex > period)
+                throw new Exception();
+            if (endIndex <= startIndex)
+                throw new Exception();
+
             var indexesCount = targetVolumes.Select(x => x.Item2.Count(y => y >= startIndex && y < endIndex)).ToList();
             int max = indexesCount.Max();
             return indexesCount.IndexOf(max);
         }
         
+        public bool SplitBatch(int batchIdx, int splitIdx, double[] beforeVolume)
+        {
+            if (batchIdx < 0 || batchIdx > targetVolumes.Count() - 1)
+                throw new Exception();
+            if (splitIdx < 1 || splitIdx > period - 1)
+                throw new Exception();
+            if (beforeVolume == null)
+                throw new Exception();
+            if (beforeVolume.Count() != dimension)
+                throw new Exception();
+            if (beforeVolume.Any(x => x < 0))
+                throw new Exception();
+
+            var volume = targetVolumes[batchIdx].Item1;
+            var indexes = targetVolumes[batchIdx].Item2;
+
+            int batchSplitPoint = 0;
+            for (int i = 1; i < indexes.Count(); i++)
+            {
+                if (indexes[i] >= splitIdx)
+                {
+                    batchSplitPoint = indexes[i];
+                    break;
+                }
+            }
+
+            List<int> indexes1 = indexes.GetRange(0, batchSplitPoint),
+                indexes2 = indexes.GetRange(batchSplitPoint, indexes.Count() - batchSplitPoint);
+
+            double[] volume1 = beforeVolume;
+            double[] volume2 = volume.Zip(beforeVolume, (x,y) => x - y).ToArray();
+
+            targetVolumes.RemoveAt(batchIdx);
+            targetVolumes.Add(new Tuple<double[], List<int>>(volume1, indexes1));
+            targetVolumes.Add(new Tuple<double[], List<int>>(volume1, indexes1));
+
+            return true;
+        }
+                
+        public List<double[]> GetUniformVolumes()
+        {
+            List<double[]> result = new double[period][].ToList();
+
+            foreach(var kv in fixValues)
+            {
+                result[kv.Key] = kv.Value;
+            }
+
+            foreach(var tuple in targetVolumes)
+            {
+                List<int> indexes = tuple.Item2.ToList();
+                double[] volume = tuple.Item1.ToList().ToArray();
+                foreach(var idx in indexes)
+                {
+                    if (fixValues.ContainsKey(idx))
+                    {
+                        indexes.Remove(idx);
+                        volume = volume.Zip(fixValues[idx], (x, y) => x - y).ToArray();
+                    }
+                }
+                volume = volume.Select(x => x / indexes.Count()).ToArray();
+                foreach (var idx in indexes)
+                {
+                    result[idx] = volume.ToList().ToArray();
+                }
+            }
+
+            return result;
+        }
     }
 }

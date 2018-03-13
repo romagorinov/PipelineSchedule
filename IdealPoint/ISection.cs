@@ -22,7 +22,7 @@ namespace Algorithms
             get;
         }
 
-        List<List<int>> StopIndexes
+        List<List<int>> RepairsIntervals
         {
             get;
         }
@@ -31,13 +31,17 @@ namespace Algorithms
 
         #region Методы
 
-        List<Tuple<List<double[]>, List<int>>> GetSchedule(TargetVolumes volumes);
+        List<Tuple<List<double[]>, List<int>>> GetSolution(TargetVolumes volumes);
+
+        List<double[]> GetContinuousSchedule(TargetVolumes volumes);
 
         void CalcDefaultIntervalsParameters(TargetVolumes volumes);
 
         List<double[]> GetFullSchedule(List<double[]> schedule);
 
         List<double[]> GetShortSchedule(List<double[]> schedule);
+
+        RepairMathModel GetRepair(int interval);
 
         #endregion
     }

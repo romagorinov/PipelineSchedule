@@ -430,7 +430,7 @@ namespace IdealPointWPF
 
             var reservoir2Pumps = Algorithms.AlgorithmHelper.CreateListOfElements(p.Period, (-targets.batches["Труба откачка У НПЗ"][0].Item1[0] + targets.batches["Труба подкачка ГНПС 2"][0].Item1[0]) / p.Period).ToArray();
 
-            var tankersStartVolume = new double[] { 12.8, 30.6, 17.7 };
+            var tankersStartVolume = new double[] { 30, 30.6, 17.7 };
 
             DateTime time = DateTime.Now;
             Dictionary<string, List<double[]>> tuSchedules = p.Algorithm(targets, tankersStartVolume, (str) => SetWinTitle(str));

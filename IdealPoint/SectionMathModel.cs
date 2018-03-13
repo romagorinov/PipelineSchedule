@@ -52,7 +52,7 @@ namespace Algorithms
 
         public int Period => _period;
 
-        public List<List<int>> StopIndexes
+        public List<List<int>> RepairsIntervals
         {
             get;
             private set;
@@ -88,30 +88,30 @@ namespace Algorithms
             
             MaxError = 0.001;
 
-            StopIndexes = new List<List<int>>();
-            bool currentStop = false;
-            List<int> stopIndexes = null;
+            RepairsIntervals = new List<List<int>>();
+            bool currentRepair = false;
+            List<int> repairIndexes = null;
             for (int i = 0; i < Period; i++)
             {
-                if (_repairs[i] == 0.0)
+                if (_repairs[i] != _notRepair)
                 {
-                    if (!currentStop)
+                    if (!currentRepair)
                     {
-                        stopIndexes = new List<int>() { i };
-                        currentStop = true;
+                        repairIndexes = new List<int>() { i };
+                        currentRepair = true;
                     }
                     else
-                        stopIndexes.Add(i);
+                        repairIndexes.Add(i);
                 }
-                else if (currentStop == true)
+                else if (currentRepair == true)
                 {
-                    StopIndexes.Add(stopIndexes);
-                    currentStop = false;
-                    stopIndexes = null;
+                    RepairsIntervals.Add(repairIndexes);
+                    currentRepair = false;
+                    repairIndexes = null;
                 }
             }
-            if (stopIndexes != null)
-                StopIndexes.Add(stopIndexes);
+            if (repairIndexes != null)
+                RepairsIntervals.Add(repairIndexes);
         }
 
         #endregion
@@ -148,7 +148,10 @@ namespace Algorithms
         private List<Tuple<List<double>, List<int>>> DecomposeVolumes(TargetVolumes volumes)
         {
             List<Tuple<List<double>, List<int>>> result = new List<Tuple<List<double>, List<int>>>();
-            
+
+            if (GetContinuousSchedule(volumes) == null)
+                return null;
+
             foreach(var tuple in volumes.targetVolumes)
             {
                 var indexes = tuple.Item2;
@@ -223,11 +226,51 @@ namespace Algorithms
             return result;
         }
 
+        private List<double> GetContinuousSchedule(double volume, List<int> indexes)
+        {
+            int period = indexes.Count();
+            List<double> result = AlgorithmHelper.CreateListOfElements(period, volume / period);
+            List<double> upperBound = _avaliableRegimesOnIntervals.Where((x, i) => indexes.Contains(i)).Select(x => x.Max()).ToList();
+
+            if (upperBound.Sum() < volume)
+                return null;
+
+            List<bool> canChange = AlgorithmHelper.CreateListOfElements(period, true);
+            int k = 1000;
+            while (k -- > 0)
+            {
+                double vol = 0.0;
+                for (int i = 0; i < period; i++)
+                {
+                    if (result[i] > upperBound[i])
+                    {
+                        vol += result[i] - upperBound[i];
+                        result[i] = upperBound[i];
+                        canChange[i] = false;
+                    }
+                }
+
+                if (vol == 0.0)
+                    return result;
+
+                vol /= canChange.Count(x => x);
+                for (int i = 0; i < period; i++)
+                {
+                    if (canChange[i])
+                    {
+                        result[i] += vol;
+                    }
+                }
+            }
+
+            throw new Exception();
+        }
+
         #endregion
 
         #region Реализация интерфейсов
 
-        public List<Tuple<List<double[]>, List<int>>> GetSchedule(TargetVolumes volumes)
+        public List<Tuple<List<double[]>, List<int>>> GetSolution(TargetVolumes volumes)
         {
             CheckVolumes(volumes);
             var result = DecomposeVolumes(volumes);
@@ -287,6 +330,49 @@ namespace Algorithms
         public List<double[]> GetShortSchedule(List<double[]> schedule)
         {
             return schedule;
+        }
+
+        public List<double[]> GetContinuousSchedule(TargetVolumes volumes)
+        {
+            CheckVolumes(volumes);
+
+            List<double[]> result = AlgorithmHelper.CreateListOfArrays(_period, 1, 0.0);
+
+            foreach (var tuple in volumes.targetVolumes)
+            {
+                var indexes = tuple.Item2;
+                var volume = tuple.Item1[0];
+
+                var notFixIndexes = new List<int>();
+                double notFixVolume = volume;
+                for(int i = 0; i < indexes.Count(); i++)
+                {
+                    int idx = indexes[i];
+                    double[] fix = volumes.GetFix(idx);
+                    if (fix == null)
+                    {
+                        notFixIndexes.Add(idx);
+                    }
+                    else
+                    {
+                        notFixVolume -= fix[0];
+                        result[idx] = fix;
+                    }
+                }
+                var res = GetContinuousSchedule(notFixVolume, notFixIndexes);
+                for (int i = 0; i < notFixIndexes.Count(); i++)
+                {
+                    result[notFixIndexes[i]] = new double[] { res[i] };
+                }
+            }
+
+            return result;
+        }
+
+        public RepairMathModel GetRepair(int interval)
+        {
+            double rep = _repairs[interval];
+            return new RepairMathModel(rep, new double[] { }, rep);
         }
 
         #endregion

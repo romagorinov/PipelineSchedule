@@ -32,14 +32,19 @@ namespace Algorithms
                 throw new Exception();
             if (maxPumps == null)
                 throw new Exception();
-            if (maxPumps.Count() == 0)
-                throw new Exception();
             if (maxOutput < 0)
                 throw new Exception();
 
             _maxInput = maxInput;
             _maxPumps = maxPumps.ToList().ToArray();
             _maxOutput = maxOutput;
+        }
+
+        public RepairMathModel(RepairMathModel p)
+        {
+            _maxInput = p._maxInput;
+            _maxPumps = p._maxPumps.ToList().ToArray();
+            _maxOutput = p._maxOutput;
         }
 
         #endregion

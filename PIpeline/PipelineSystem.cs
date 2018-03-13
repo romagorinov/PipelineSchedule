@@ -71,7 +71,7 @@ namespace Pipeline
             DiscreteSchedule tu1MainRepairs = new DiscreteSchedule(Period, bigMaxflowValue);
             tu1MainRepairs.FillInterval(61.5 / 24, 10 * 24 + 12, 10 * 24 + 13);
             tu1MainRepairs.FillInterval(46.1 / 24, 11 * 24 + 12, 11 * 24 + 16);
-            //tu1MainRepairs.FillInterval(0, 11 * 24 + 12, 11 * 24 + 30);
+            //tu1MainRepairs.FillInterval(0, 11 * 24 + 12, 11 * 24 + 38);
             tu1MainRepairs.FillInterval(61.5 / 24, 12 * 24 + 12, 12 * 24 + 14);
             tu1MainRepairs.FillInterval(53.5 / 24, 17 * 24 + 12, 17 * 24 + 16);
             tu1MainRepairs.FillInterval(46.1 / 24, 18 * 24 + 12, 18 * 24 + 14);
@@ -80,7 +80,7 @@ namespace Pipeline
             DiscreteSchedule tu2MainRepairs = new DiscreteSchedule(Period, bigMaxflowValue);
             tu2MainRepairs.FillInterval(56.1 / 24, 10 * 24 + 12, 10 * 24 + 14);
             tu2MainRepairs.FillInterval(56.1 / 24, 11 * 24 + 12, 11 * 24 + 14);
-            //tu2MainRepairs.FillInterval(0, 11 * 24 + 12, 11 * 24 + 30);
+            tu2MainRepairs.FillInterval(0, 11 * 24 + 12, 11 * 24 + 24);
             tu2MainRepairs.FillInterval(56.1 / 24, 12 * 24 + 12, 12 * 24 + 14);
             tu2MainRepairs.FillInterval(56.1 / 24, 13 * 24 + 12, 13 * 24 + 14);
             tu2MainRepairs.FillInterval(56.1 / 24, 24 * 24 + 12, 24 * 24 + 14);
@@ -360,7 +360,7 @@ namespace Pipeline
                     target.Value.ForEach(x => curTarget.AddVolume(x.Item1, x.Item2.ToList()));
                     tuMathModel.CalcDefaultIntervalsParameters(curTarget);
                     tuMathModels.Add(target.Key, tuMathModel);
-                    var initialSolution = tuMathModel.GetSchedule(curTarget);
+                    var initialSolution = tuMathModel.GetSolution(curTarget);
                     if (initialSolution == null)
                     {
                         MessageBox.Show($"Ошибка исходных данных. По {target.Key} нельзя перекачать заданные объемы");
