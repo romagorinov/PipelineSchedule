@@ -584,12 +584,12 @@ namespace Algorithms
             int maxIter = 1;
             for (int i = 0; i < maxIter; i++)
             {
-                /*initialSchedules = Permute(initialSchedules, 24, 100, informationAction);
+                initialSchedules = Permute(initialSchedules, 24, 100, informationAction);
                 CalcOverfill();
                 if (prevOverfillVolumes.All(x => x == 0.0))
                 {
                     return ConvertResult();
-                }*/
+                }
                 /*bool breaker = !Analyse(initialSchedules);
                 if (breaker)
                     break;
