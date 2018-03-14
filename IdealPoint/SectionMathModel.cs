@@ -375,6 +375,15 @@ namespace Algorithms
             return new RepairMathModel(rep, new double[] { }, rep);
         }
 
+        public double[] GetLowerRegime(int interval, double[] currentRegime, bool output = false)
+        {
+            double val = currentRegime[0];
+            var avalRegimes = _avaliableRegimesOnIntervals[interval].Where(x => x < val).ToList();
+            if (avalRegimes.Count() == 0)
+                return null;
+            return new double[] { avalRegimes[AlgorithmHelper.NearestByModul(avalRegimes, val)] };
+        }
+
         #endregion
 
         #endregion

@@ -193,6 +193,13 @@ namespace Algorithms
 
             return AlgorithmHelper.SolveQP(Q, d, A, b, 0);
         }
+        
+        public double GetOutputElement(double[] Gpumps)
+        {
+            CheckPumps(Gpumps);
+
+            return Gin + Gpumps.Zip(pumpSign, (x, y) => x * y).Sum();
+        }
 
         /*public static bool operator == (RegimeMathModel r1, RegimeMathModel r2)
         {

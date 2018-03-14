@@ -43,6 +43,8 @@ namespace Algorithms
 
         RepairMathModel GetRepair(int interval);
 
+        double[] GetLowerRegime(int interval, double[] currentRegime, bool output = false);
+
         #endregion
     }
 }

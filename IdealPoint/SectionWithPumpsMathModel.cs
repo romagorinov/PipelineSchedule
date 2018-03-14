@@ -1004,6 +1004,83 @@ namespace Algorithms
             return new RepairMathModel(_repairs[interval]);
         }
 
+        public double[] GetLowerRegime(int interval, double[] currentRegime, bool output = false)
+        {
+            currentRegime = currentRegime.ToList().GetRange(0, _pumpsCount + 1).ToArray();
+            if (!output)
+            {
+                var val = currentRegime[0];
+                // Режимы ниже текущего по входу
+                var avalRegimes = _currentIntervalsParameters.avaliableRegimesOnIntervals[interval].Where(x => x.Gin < val).ToList();
+                if (avalRegimes.Count() == 0)
+                    return null;
+
+                var repair = _repairs[interval];
+                var pumps = Convert(currentRegime).Item2;
+
+                // По возможности соблюдая подкачки
+                var canPumpRegimes = avalRegimes.Where(x => x.CanPump(pumps, repair)).ToList();
+                if (canPumpRegimes.Count() > 0)
+                    avalRegimes = canPumpRegimes;
+
+                var gin = avalRegimes.Select(x => x.Gin).ToList();
+
+                var lowerRegime = avalRegimes[AlgorithmHelper.NearestByModul(gin, val)];
+                if (!lowerRegime.CanPump(pumps, repair))
+                {
+                    pumps = lowerRegime.GetNearestPumpsPoit(pumps, repair);
+                }
+
+                return Convert(lowerRegime.Gin, pumps);
+            }
+            else
+            {
+                // Режимы ниже текущего по выходу
+                var avalRegimes = _currentIntervalsParameters.avaliableRegimesOnIntervals[interval].ToList();
+                if (avalRegimes.Count() == 0)
+                    return null;
+
+                var repair = _repairs[interval];
+                var pumps = Convert(currentRegime).Item2;
+
+                List<double> outputValues = new List<double>();
+                List<bool> canPumpRegimes = new List<bool>();
+                List<double[]> volumePumpRegimes = new List<double[]>();
+                foreach(var regime in avalRegimes)
+                {
+                    double[] curPumps = null;
+                    if (regime.CanPump(pumps, repair))
+                    {
+                        curPumps = pumps;
+                        canPumpRegimes.Add(true);
+                    }
+                    else
+                    {
+                        curPumps = regime.GetNearestPumpsPoit(pumps, repair);
+                        canPumpRegimes.Add(false);
+                    }
+
+                    double outputElement = regime.GetOutputElement(curPumps);
+                    if (outputElement >= currentRegime.Last())
+                        outputElement = double.PositiveInfinity;
+                    outputValues.Add(outputElement);
+                    volumePumpRegimes.Add(curPumps);
+                }
+
+                if (outputValues.All(x => double.IsPositiveInfinity(x)))
+                {
+                    return null;
+                }
+                else
+                {
+                    if (canPumpRegimes.Any(x => x))
+                        outputValues = outputValues.Zip(canPumpRegimes, (x, y) => y ? x : double.PositiveInfinity).ToList();
+                    var idx = AlgorithmHelper.NearestByModul(outputValues, currentRegime.Last());
+                    return Convert(avalRegimes[idx].Gin, volumePumpRegimes[idx]);
+                }
+            }
+        }
+
         #endregion
 
         #endregion

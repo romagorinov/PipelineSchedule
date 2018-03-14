@@ -584,13 +584,13 @@ namespace Algorithms
             int maxIter = 1;
             for (int i = 0; i < maxIter; i++)
             {
-                initialSchedules = Permute(initialSchedules, 24, 100, informationAction);
+                /*initialSchedules = Permute(initialSchedules, 24, 100, informationAction);
                 CalcOverfill();
                 if (prevOverfillVolumes.All(x => x == 0.0))
                 {
                     return ConvertResult();
-                }
-                bool breaker = !Analyse(initialSchedules);
+                }*/
+                /*bool breaker = !Analyse(initialSchedules);
                 if (breaker)
                     break;
                 CalcInitialSchedules();
@@ -598,7 +598,7 @@ namespace Algorithms
                 if (prevOverfillVolumes.All(x => x == 0.0))
                 {
                     return ConvertResult();
-                }
+                }*/
             }
 
             if (initialSchedules == null)
@@ -861,11 +861,64 @@ namespace Algorithms
                 reservoirCrashIndexes.Add(GetCrashIndexes(reservoirInitialSchedules.Last(), 0, _reservoirVolumes[i]));
             }
 
+            Action<double, int, int, int> DecreaseRate = (volume, startIdx, length, sectionNumber) =>
+            {
+                var section = _sections[sectionNumber];
+                List<double[]> newSectionSchedule = initialSchedules[sectionNumber].GetRange(startIdx, length);
+                double newSectionVolume = newSectionSchedule.Sum(x => x[0]);
+                double oldSectionVolume = newSectionVolume;
+                while (true)
+                {
+                    int zeroCounter = 0;
+                    bool end = false;
+                    for (int i = startIdx; i < startIdx + length; i++)
+                    {
+                        var lowerRegime = section.GetLowerRegime(i, newSectionSchedule[i - startIdx]);
+                        if (lowerRegime != null)
+                        {
+                            newSectionVolume -= newSectionSchedule[i - startIdx][0] - lowerRegime[0];
+                            if (oldSectionVolume - newSectionVolume > volume || newSectionVolume < 0)
+                            {
+                                end = true;
+                                break;
+                            }
+                            newSectionSchedule[i - startIdx] = lowerRegime;
+                        }
+                        else
+                        {
+                            zeroCounter++;
+                        }
+                    }
+
+                    if (end)
+                        break;
+
+                    if (zeroCounter == length)
+                    {
+                        for (int i = startIdx + length - 1; i >= startIdx; i--)
+                        {
+                            newSectionVolume -= newSectionSchedule[i - startIdx][0];
+                            if (oldSectionVolume - newSectionVolume > volume || newSectionVolume < 0)
+                                break;
+                            newSectionSchedule[i - startIdx] = new double[section.Dimension];
+                        }
+                        break;
+                    }
+                }
+
+                for (int i = startIdx; i < startIdx + length; i++)
+                {
+                    _tempTargetVolumes[sectionNumber].AddFixValue(i, newSectionSchedule[i - startIdx]);
+                }
+            };
+
             for (int i = 0; i < _sections.Count(); i++)
             {
                 var section = _sections[i];
                 if (section == null)
                     continue;
+
+                bool breaker = false;
 
                 var badStartRepairs = new List<List<int>>();
                 var badEndRepairs = new List<List<int>>();
@@ -921,8 +974,10 @@ namespace Algorithms
                         }
                         else if (startVolume < _reservoirVolumes[i] && endVolume < 0)
                         {
-                            // Нужно немного наполнить резервуар
-                            test = 0;
+                            double repairPumpVolume = _tempPumpSchedules[i].GetRange(repair[0], repairLen).Sum();
+                            //DecreaseRate(100, repair[0], repairLen, i + 1);
+                            breaker = true;
+                            break;
                         }
                         else if (startVolume > _reservoirVolumes[i] && endVolume > 0)
                         {
@@ -937,6 +992,8 @@ namespace Algorithms
 
                     }
                 }
+                if (breaker)
+                    break;
             }
 
             CreateTempSolution();
