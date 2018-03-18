@@ -519,5 +519,14 @@ namespace Algorithms
             return list.Select(arr => arr.Select(x => Math.Round(x, digits)).ToArray()).ToList();
         }
         
+        public static List<T> GetIndexes<T>(List<T> list, List<int> indexes)
+        {
+            List<T> result = new List<T>();
+            foreach(var idx in indexes)
+                result.Add(list[idx]);
+            return result;
+        }
+
+
     }
 }

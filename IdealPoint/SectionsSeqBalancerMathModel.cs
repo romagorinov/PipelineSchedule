@@ -544,15 +544,15 @@ namespace Algorithms
             List<List<double[]>> initialSchedules = null;
             List<double> prevOverfillVolumes = new List<double>();
 
-            Func<List<List<double[]>>> ConvertResult = () =>
+            List<List<double[]>> ConvertResult()
             {
                 if (_sections[0] == null)
                     initialSchedules.RemoveAt(0);
                 else if (_sections.Last() == null)
                     initialSchedules.RemoveAt(initialSchedules.Count() - 1);
                 return initialSchedules;
-            };
-            Action CalcInitialSchedules = () =>
+            }
+            void CalcInitialSchedules()
             {
                 initialSchedules = _tempSolutions.Select((x, i) =>
                 {
@@ -561,8 +561,8 @@ namespace Algorithms
                     else
                         return _sections[i].GetFullSchedule(CreateInitialSchedule(x));
                 }).ToList();
-            };
-            Action CalcOverfill = () =>
+            }
+            void CalcOverfill()
             {
                 prevOverfillVolumes = new List<double>();
                 for (int i = 0; i < initialSchedules.Count() - 1; i++)
@@ -570,9 +570,9 @@ namespace Algorithms
                     var reservoirSchedule = GetReservoirSchedule(initialSchedules[i], initialSchedules[i + 1], _tempPumpSchedules[i], _oilStartVolumes[i]);
                     prevOverfillVolumes.Add(GetOverfillVolume(reservoirSchedule, 0, _reservoirVolumes[i]));
                 }
-            };
+            }
 
-            // Сначала без анализа
+            // Сначала без анализа и перестановок
             CreateTempSolution();
             CalcInitialSchedules();
             CalcOverfill();
@@ -584,12 +584,14 @@ namespace Algorithms
             int maxIter = 1;
             for (int i = 0; i < maxIter; i++)
             {
+                // Перестановки
                 initialSchedules = Permute(initialSchedules, 24, 100, informationAction);
                 CalcOverfill();
                 if (prevOverfillVolumes.All(x => x == 0.0))
                 {
                     return ConvertResult();
                 }
+                // Анализ и изменение объемов
                 /*bool breaker = !Analyse(initialSchedules);
                 if (breaker)
                     break;
@@ -621,7 +623,7 @@ namespace Algorithms
             }
 
             int curIter = 0;
-            Func<int, TempBalanceStruct> GetInitStruct = (sectionNumber) =>
+            TempBalanceStruct GetInitStruct(int sectionNumber)
             {
                 var tempStruct = new TempBalanceStruct()
                 {
@@ -649,7 +651,7 @@ namespace Algorithms
                     tempStruct.endReservoirVolume = _reservoirVolumes[sectionNumber];
                 }
                 return tempStruct;
-            };
+            }
             //bool[][] crashIndexesBool = reservoirCrashIndexes.Select((x, i) => new bool[_period].Select((y,j) => x.Contains(j)).ToArray()).ToArray();
             while (maxIter > curIter++)
             {
@@ -861,28 +863,30 @@ namespace Algorithms
                 reservoirCrashIndexes.Add(GetCrashIndexes(reservoirInitialSchedules.Last(), 0, _reservoirVolumes[i]));
             }
 
-            Action<double, int, int, int> DecreaseRate = (volume, startIdx, length, sectionNumber) =>
+            void DecreaseRate(double volume, List<int> indexes, int sectionNumber, bool allowZero)
             {
                 var section = _sections[sectionNumber];
-                List<double[]> newSectionSchedule = initialSchedules[sectionNumber].GetRange(startIdx, length);
+                List<double[]> newSectionSchedule = AlgorithmHelper.GetIndexes(initialSchedules[sectionNumber], indexes);
                 double newSectionVolume = newSectionSchedule.Sum(x => x[0]);
                 double oldSectionVolume = newSectionVolume;
+                int len = indexes.Count();
                 while (true)
                 {
                     int zeroCounter = 0;
                     bool end = false;
-                    for (int i = startIdx; i < startIdx + length; i++)
+                    for (int i = 0; i < len; i++)
                     {
-                        var lowerRegime = section.GetLowerRegime(i, newSectionSchedule[i - startIdx]);
+                        var idx = indexes[i];
+                        var lowerRegime = section.GetLowerRegime(idx, newSectionSchedule[i]);
                         if (lowerRegime != null)
                         {
-                            newSectionVolume -= newSectionSchedule[i - startIdx][0] - lowerRegime[0];
+                            newSectionVolume -= newSectionSchedule[i][0] - lowerRegime[0];
                             if (oldSectionVolume - newSectionVolume > volume || newSectionVolume < 0)
                             {
                                 end = true;
                                 break;
                             }
-                            newSectionSchedule[i - startIdx] = lowerRegime;
+                            newSectionSchedule[i] = lowerRegime;
                         }
                         else
                         {
@@ -893,24 +897,25 @@ namespace Algorithms
                     if (end)
                         break;
 
-                    if (zeroCounter == length)
+                    if (zeroCounter == len)
                     {
-                        for (int i = startIdx + length - 1; i >= startIdx; i--)
-                        {
-                            newSectionVolume -= newSectionSchedule[i - startIdx][0];
-                            if (oldSectionVolume - newSectionVolume > volume || newSectionVolume < 0)
-                                break;
-                            newSectionSchedule[i - startIdx] = new double[section.Dimension];
-                        }
+                        if (allowZero)
+                            for (int i = len - 1; i >= 0; i--)
+                            {
+                                newSectionVolume -= newSectionSchedule[i][0];
+                                if (oldSectionVolume - newSectionVolume > volume || newSectionVolume < 0)
+                                    break;
+                                newSectionSchedule[i] = new double[section.Dimension];
+                            }
                         break;
                     }
                 }
 
-                for (int i = startIdx; i < startIdx + length; i++)
+                for (int i = 0; i < len; i++)
                 {
-                    _tempTargetVolumes[sectionNumber].AddFixValue(i, newSectionSchedule[i - startIdx]);
+                    _tempTargetVolumes[sectionNumber].AddFixValue(indexes[i], newSectionSchedule[i]);
                 }
-            };
+            }
 
             for (int i = 0; i < _sections.Count(); i++)
             {
