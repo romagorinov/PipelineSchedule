@@ -76,290 +76,29 @@ namespace Algorithms
 
         #region Вспомогательные структуры и классы
         
-        //public class ReservoirMathModelChromosome: IChromosome
-        //{
-        //    public ReservoirMathModel _model;
-        //    public List<int> _sequence;
-        //    public List<double[]> _inputSchedule;
-        //    public List<double[]> _outputSchedule;
+        struct TempBalanceStruct
+        {
+            public List<double[]> initialSchedule;
+            public List<double> startReservoirSchedule, endReservoirSchedule;
+            public List<double> startReservoirPumpsSchedule, endReservoirPumpsSchedule;
+            public List<int> startReservoirCrashIndexes, endReservoirCrashIndexes;
+            public double startReservoirPrevOverfillVolume, endReservoirPrevOverfillVolume;
+            public double startReservoirStartVolume, endReservoirStartVolume;
+            public double startReservoirVolume, endReservoirVolume;
+            public int sectionNumber;
+        }
 
-        //    public double? Fitness
-        //    {
-        //        get;
-        //        set;
-        //    }
+        struct TempBagStruct
+        {
+            public int sectionNumber;
+            public double startReservoirOverfillVolume;
+            public double endReservoirOverfillVolume;
+            public int changesCount;
+            public double changesVolume;
+            public List<int> block1;
+            public List<int> block2;
+        }
 
-        //    public int Length
-        //    {
-        //        get;
-        //        set;
-        //    }
-
-        //    public ReservoirMathModelChromosome(ReservoirMathModel model)
-        //    {
-        //        _model = model;
-        //        Length = _model._period * 2;
-        //        Initialize();
-        //        Decode();
-        //    }
-
-        //    public ReservoirMathModelChromosome(ReservoirMathModelChromosome chromosome)
-        //    {
-        //        _model = chromosome._model;
-        //        Length = _model._period * 2;
-        //        _sequence = chromosome._sequence.Select(x => x).ToList();
-        //        _inputSchedule = chromosome._inputSchedule.Select(x => x.Select(y => y).ToArray()).ToList();
-        //        _outputSchedule = chromosome._outputSchedule.Select(x => x.Select(y => y).ToArray()).ToList();
-        //        Fitness = chromosome.Fitness;
-        //    }
-
-        //    public IChromosome Clone()
-        //    {
-        //        return new ReservoirMathModelChromosome(this);
-        //    }
-
-        //    public int CompareTo(IChromosome other)
-        //    {
-        //        if (other == null)
-        //        {
-        //            return -1;
-        //        }
-
-        //        var otherFitness = other.Fitness;
-
-        //        if (Fitness == otherFitness)
-        //        {
-        //            return 0;
-        //        }
-                
-        //        return Fitness > otherFitness ? 1 : -1;
-        //    }
-
-        //    public IChromosome CreateNew()
-        //    {
-        //        return new ReservoirMathModelChromosome(_model);
-        //    }
-            
-        //    private void Initialize()
-        //    {
-        //        _sequence = new List<int>();
-
-        //        Func<List<int>, List<int>> initializer = (initialCount) =>
-        //        {
-        //            List<int> result = new List<int>();
-        //            if (initialCount == null)
-        //            {
-        //                for (int i = 0; i < _model._period; i++)
-        //                    result.Add(0);
-        //            }
-        //            else
-        //            {
-        //                for (int i = 0; i < initialCount.Count(); i++)
-        //                {
-        //                    int currentCount = initialCount[i];
-        //                    if (currentCount == 1)
-        //                        result.Add(0);
-        //                    else
-        //                        while (currentCount > 0)
-        //                        {
-        //                            result.Add(AlgorithmHelper.RandomInstance.Next(0, currentCount));
-        //                            currentCount--;
-        //                        }
-        //                }
-        //            }
-        //            return result;
-        //        };
-                
-        //        _sequence.AddRange(initializer(_model._tempInputCounts));
-        //        _sequence.AddRange(initializer(_model._tempOutputCounts));
-        //    }
-
-        //    public void Decode()
-        //    {
-        //        int period = _model._period;
-        //        _inputSchedule = new List<double[]>();
-        //        _outputSchedule = new List<double[]>();
-
-        //        Func<List<int>, List<Tuple<List<double[]>, List<int>>>, List<double[]>> decoder = (seq, initialSolution) =>
-        //        {
-        //            var result = new double[_model._period][].ToList();
-        //            if (initialSolution == null)
-        //            {
-        //                return AlgorithmHelper.CreateListOfArrays(_model._period, 1, 0.0);
-        //            }
-        //            int seqIdx = 0;
-        //            foreach (var el in initialSolution)
-        //            {
-        //                var indexes = el.Item2;
-        //                var values = el.Item1.Select(x => x).ToList();
-        //                for (int i = 0; i < indexes.Count(); i++)
-        //                {
-        //                    var val = values[seq[seqIdx]];
-        //                    values.RemoveAt(seq[seqIdx]);
-        //                    result[indexes[i]] = val;
-        //                    seqIdx++;
-        //                }
-        //            }
-        //            return result;
-        //        };
-
-        //        _inputSchedule = decoder(_sequence.GetRange(0, _model._period).ToList(), _model._tempInputSolution);
-        //        _outputSchedule = decoder(_sequence.GetRange(_model._period, _model._period).ToList(), _model._tempOutputSolution);
-        //    }
-
-        //    public Gene GenerateGene(int geneIndex)
-        //    {
-        //        throw new NotImplementedException();
-        //    }
-
-        //    public void ReplaceGene(int index, Gene gene)
-        //    {
-        //        throw new NotImplementedException();
-        //    }
-
-        //    public void ReplaceGenes(int startIndex, Gene[] genes)
-        //    {
-        //        throw new NotImplementedException();
-        //    }
-
-        //    public void Resize(int newLength)
-        //    {
-        //        throw new NotImplementedException();
-        //    }
-
-        //    public Gene GetGene(int index)
-        //    {
-        //        throw new NotImplementedException();
-        //    }
-
-        //    public Gene[] GetGenes()
-        //    {
-        //        return _sequence.Select(x => new Gene(x)).ToArray();
-        //    }
-        //}
-
-        //public class ReservoirMathModelMutation : IMutation
-        //{
-        //    public bool IsOrdered => true;
-
-        //    public void Mutate(IChromosome chromosome, float probability)
-        //    {
-        //        var c = chromosome as ReservoirMathModelChromosome;
-
-        //        Func<List<int>, List<int>, List<int>> mutator = (seq, initialCount) =>
-        //        {
-        //            var result = seq.Select(x => x).ToList();
-        //            if (initialCount == null)
-        //            {
-        //                return seq;
-        //            }
-        //            else
-        //            {
-        //                int counter = 0;
-        //                for (int i = 0; i < initialCount.Count(); i++)
-        //                {
-        //                    int currentCount = initialCount[i];
-        //                    if (currentCount == 1)
-        //                    {
-        //                        counter++;
-        //                    }
-        //                    else
-        //                        while (currentCount > 0)
-        //                        {
-        //                            if (AlgorithmHelper.RandomInstance.NextDouble() < probability)
-        //                            {
-        //                                seq[counter] = AlgorithmHelper.RandomInstance.Next(0, currentCount);
-        //                            }
-        //                            currentCount--;
-        //                            counter++;
-        //                        }
-        //                }
-        //                return result;
-        //            }
-        //        };
-
-        //        var newSeq = new List<int>();
-        //        int period = c._model._period;
-        //        newSeq.AddRange(mutator(c._sequence.GetRange(0, period).ToList(), c._model._tempInputCounts));
-        //        newSeq.AddRange(mutator(c._sequence.GetRange(period, period).ToList(), c._model._tempOutputCounts));
-        //        c._sequence = newSeq;
-        //        c.Decode();
-        //    }
-        //}
-
-        //public class ReservoirMathModelFitness : IFitness
-        //{
-        //    public double Evaluate(IChromosome chromosome)
-        //    {
-        //        ReservoirMathModelChromosome c = chromosome as ReservoirMathModelChromosome;
-
-        //        var reservoirSchedule = c._model.GetReservoirSchedule(c._inputSchedule, c._outputSchedule);
-
-        //        var overvolume = reservoirSchedule.Sum(x =>
-        //        {
-        //            if (x < 0)
-        //                return -x;
-        //            else if (x > c._model._reservoirVolume)
-        //                return c._model._reservoirVolume - x;
-        //            else
-        //                return 0.0;
-        //        });
-
-        //        var changesCount = 0.0;
-        //        Func<List<double[]>, int> changesCounter = (schedule) =>
-        //        {
-        //            int result = 0;
-        //            for (int i = 1; i < schedule.Count(); i++)
-        //            {
-        //                if (schedule[i][0] != schedule[i - 1][0])
-        //                    result++;
-        //            }
-        //            return result;
-        //        };
-        //        changesCount += changesCounter(c._inputSchedule) + changesCounter(c._outputSchedule);
-
-        //        return 1 / (changesCount + 0.01) /*+ overvolume*/;
-        //    }
-        //}
-
-        //public class ReservoirMathModelCrossOver : ICrossover
-        //{
-        //    public int ParentsNumber => 2;
-
-        //    public int ChildrenNumber => 2;
-
-        //    public int MinChromosomeLength => 1488;
-
-        //    public bool IsOrdered => true;
-
-        //    public IList<IChromosome> Cross(IList<IChromosome> parents)
-        //    {
-        //        var p1 = parents[0] as ReservoirMathModelChromosome;
-        //        var p2 = parents[1] as ReservoirMathModelChromosome;
-
-        //        var model = p1._model;
-
-        //        var c1 = new ReservoirMathModelChromosome(p1);
-        //        var c2 = new ReservoirMathModelChromosome(p2);
-
-        //        int pointIdx = AlgorithmHelper.RandomInstance.Next(1, model._period * 2 - 1);
-
-        //        for (int i = 0; i < pointIdx; i++)
-        //        {
-        //            c1._sequence[i] = p1._sequence[i];
-        //            c2._sequence[i] = p2._sequence[i];
-        //        }
-        //        for (int i = pointIdx; i < model._period * 2; i++)
-        //        {
-        //            c1._sequence[i] = p2._sequence[i];
-        //            c2._sequence[i] = p1._sequence[i];
-        //        }
-        //        c1.Decode();
-        //        c2.Decode();
-        //        return new List<IChromosome>() { c1, c2 };
-        //    }
-        //}
-        
         #endregion
 
         #region Методы
@@ -383,115 +122,10 @@ namespace Algorithms
                     throw new Exception();
                 else if (tempTargetVolumes[i] != null)
                     tempTargetVolumes[i].Check(_sections[i].Dimension);
-            /*if (tempSolutions == null)
-                throw new Exception();
-            if (tempSolutions.Count() != _sections.Count())
-                throw new Exception();
-            for (int i = 0; i < tempSolutions.Count(); i++)
-            {
-                var tempSolution = tempSolutions[i];
-                if (tempSolution == null && _sections[i] != null)
-                    throw new Exception();
-                if (tempSolution == null)
-                    continue;
-                if (tempSolution.Count() == 0)
-                    throw new Exception();
-                if (tempSolution.Any(x => x == null))
-                    throw new Exception();
-                if (tempSolution.Any(x => x.Item1 == null))
-                    throw new Exception();
-                if (tempSolution.Any(x => x.Item1.Count() == 0))
-                    throw new Exception();
-                if (tempSolution.Any(x => x.Item1.Any(y => y == null)))
-                    throw new Exception();
-                if (tempSolution.Any(x => x.Item1.Any(y => y.Count() != _sections[i].Dimension)))
-                    throw new Exception();
-                if (tempSolution.Any(x => x.Item1.Any(y => y.Any(z => z < 0))))
-                    throw new Exception();
-                if (tempSolution.Any(x => x.Item2 == null))
-                    throw new Exception();
-                if (tempSolution.Any(x => x.Item2.Count() != x.Item1.Count()))
-                    throw new Exception();
-                if (tempSolution.Any(x => x.Item2.Any(y => y < 0 || y > _period - 1)))
-                    throw new Exception();
-                if (tempSolution.SelectMany(x => x.Item2).GroupBy(x => x).Any(x => x.Count() > 1))
-                        throw new Exception();
-            }*/
 
             _tempPumpSchedules = tempPumpSchedules.Select(x => x.ToList()).ToList();
             _tempTargetVolumes = tempTargetVolumes.Select(x => x == null ? null : new TargetVolumes(x)).ToList();
             _tempSolutions = null;
-        }
-        
-        private static List<double[]> CreateInitialSchedule(List<Tuple<List<double[]>, List<int>>> initialSolution)
-        {
-            int period = initialSolution.Sum(x => x.Item2.Count());
-            var result = (new double[period][]).ToList();
-            foreach(var tuple in initialSolution)
-            {
-                tuple.Item2.Sort();
-                tuple.Item1.Sort((el1, el2) => el1[0] > el2[0] ? 1 : (el1[0] < el2[0] ? -1 : 0));
-                for(int i = 0; i < tuple.Item1.Count(); i++)
-                {
-                    result[tuple.Item2[i]] = tuple.Item1[i];
-                }
-            }
-            return result;
-        }
-
-        private static List<double[]> SwapBlocks(List<double[]> scheudule, List<int> block1, List<int> block2)
-        {
-            int blockSize = block1.Count();
-            if (blockSize != block2.Count())
-                throw new Exception();
-
-            List<double[]> result = scheudule.Select(x => x).ToList();
-            for (int k = 0; k < blockSize; k++)
-            {
-                result[block1[k]] = scheudule[block2[k]];
-                result[block2[k]] = scheudule[block1[k]];
-            }
-            return result;
-        }
-
-        private List<double> GetReservoirSchedule(List<double[]> inputSchedule, List<double[]> outputSchedule, List<double> pumpsSchedule, double startVolume)
-        {
-            List<double> result = new List<double>() { startVolume };
-            for (int i = 0; i < inputSchedule.Count(); i++)
-                result.Add(result.Last() + inputSchedule[i].Last() - outputSchedule[i].First() + pumpsSchedule[i]);
-            return result;
-        }
-
-        private List<int> GetCrashIndexes(List<double> reservoirSchedule, double minVolume, double maxVolume)
-        {
-            var result = new List<int>();
-            for (int i = 1; i < reservoirSchedule.Count(); i++)
-            {
-                var x = reservoirSchedule[i];
-                if (x < minVolume || x > maxVolume)
-                {
-                    result.Add(i);
-                }
-            }
-            return result;
-        }
-
-        private double GetOverfillVolume(List<double> reservoirSchedule, double minVolume, double maxVolume)
-        {
-            double result = 0.0;
-            for (int i = 1; i < reservoirSchedule.Count(); i++)
-            {
-                var x = reservoirSchedule[i];
-                if (x < minVolume)
-                {
-                    result += minVolume - x;
-                }
-                else if (x > maxVolume)
-                {
-                    result += x - maxVolume;
-                }
-            }
-            return result;
         }
 
         private void CreateTempSolution()
@@ -512,30 +146,7 @@ namespace Algorithms
                 }
             }
         }
-
-        struct TempBalanceStruct
-        {
-            public List<double[]> initialSchedule;
-            public List<double> startReservoirSchedule, endReservoirSchedule;
-            public List<double> startReservoirPumpsSchedule, endReservoirPumpsSchedule;
-            public List<int> startReservoirCrashIndexes, endReservoirCrashIndexes;
-            public double startReservoirPrevOverfillVolume, endReservoirPrevOverfillVolume;
-            public double startReservoirStartVolume, endReservoirStartVolume;
-            public double startReservoirVolume, endReservoirVolume;
-            public int sectionNumber;
-        }
-
-        struct TempBagStruct
-        {
-            public int sectionNumber;
-            public double startReservoirOverfillVolume;
-            public double endReservoirOverfillVolume;
-            public int changesCount;
-            public double changesVolume;
-            public List<int> block1;
-            public List<int> block2;
-        }
-        
+                
         public List<List<double[]>> Balance(Action<string> informationAction = null)
         {
             if (informationAction == null)
@@ -585,22 +196,27 @@ namespace Algorithms
             for (int i = 0; i < maxIter; i++)
             {
                 // Перестановки
+                CreateTempSolution();
+                CalcInitialSchedules();
                 initialSchedules = Permute(initialSchedules, 24, 100, informationAction);
+
                 CalcOverfill();
                 if (prevOverfillVolumes.All(x => x == 0.0))
                 {
                     return ConvertResult();
                 }
+
                 // Анализ и изменение объемов
-                /*bool breaker = !Analyse(initialSchedules);
-                if (breaker)
+                if (!Analyse(initialSchedules))
                     break;
+
+                CreateTempSolution();
                 CalcInitialSchedules();
                 CalcOverfill();
                 if (prevOverfillVolumes.All(x => x == 0.0))
                 {
                     return ConvertResult();
-                }*/
+                }
             }
 
             if (initialSchedules == null)
@@ -851,6 +467,16 @@ namespace Algorithms
             return initialSchedules;
         }
 
+        [Flags]
+        enum Decision
+        {
+            NO_DECISION,
+            DECREASE_FLOW_DIFFERENCE_INPUT_RESERVOIR,
+            DECREASE_FLOW_DIFFERENCE_OUTPUT_RESERVOIR,
+            DECREASE_LEVEL_INPUT_RESERVOIR,
+            INCREASE_LEVEL_OUTPUT_RESERVOIR
+        }
+
         private bool Analyse(List<List<double[]>> initialSchedules)
         {
             List<List<double>> reservoirInitialSchedules = new List<List<double>>();
@@ -863,146 +489,240 @@ namespace Algorithms
                 reservoirCrashIndexes.Add(GetCrashIndexes(reservoirInitialSchedules.Last(), 0, _reservoirVolumes[i]));
             }
 
-            void DecreaseRate(double volume, List<int> indexes, int sectionNumber, bool allowZero)
-            {
-                var section = _sections[sectionNumber];
-                List<double[]> newSectionSchedule = AlgorithmHelper.GetIndexes(initialSchedules[sectionNumber], indexes);
-                double newSectionVolume = newSectionSchedule.Sum(x => x[0]);
-                double oldSectionVolume = newSectionVolume;
-                int len = indexes.Count();
-                while (true)
-                {
-                    int zeroCounter = 0;
-                    bool end = false;
-                    for (int i = 0; i < len; i++)
-                    {
-                        var idx = indexes[i];
-                        var lowerRegime = section.GetLowerRegime(idx, newSectionSchedule[i]);
-                        if (lowerRegime != null)
-                        {
-                            newSectionVolume -= newSectionSchedule[i][0] - lowerRegime[0];
-                            if (oldSectionVolume - newSectionVolume > volume || newSectionVolume < 0)
-                            {
-                                end = true;
-                                break;
-                            }
-                            newSectionSchedule[i] = lowerRegime;
-                        }
-                        else
-                        {
-                            zeroCounter++;
-                        }
-                    }
-
-                    if (end)
-                        break;
-
-                    if (zeroCounter == len)
-                    {
-                        if (allowZero)
-                            for (int i = len - 1; i >= 0; i--)
-                            {
-                                newSectionVolume -= newSectionSchedule[i][0];
-                                if (oldSectionVolume - newSectionVolume > volume || newSectionVolume < 0)
-                                    break;
-                                newSectionSchedule[i] = new double[section.Dimension];
-                            }
-                        break;
-                    }
-                }
-
-                for (int i = 0; i < len; i++)
-                {
-                    _tempTargetVolumes[sectionNumber].AddFixValue(indexes[i], newSectionSchedule[i]);
-                }
-            }
-
+            Decision decision = Decision.NO_DECISION;
             for (int i = 0; i < _sections.Count(); i++)
             {
                 var section = _sections[i];
                 if (section == null)
                     continue;
 
-                bool breaker = false;
-
-                var badStartRepairs = new List<List<int>>();
-                var badEndRepairs = new List<List<int>>();
                 for (int j = 0; j < section.RepairsIntervals.Count(); j++)
                 {
                     var repair = section.RepairsIntervals[j];
                     int repairLen = repair.Count();
-                    int test = 0;
                     if (i > 0)
                     {
+                        double resVolume = _reservoirVolumes[i - 1];
                         // Смотрим изменения во входном резервуаре на данном участке
                         double startVolume = reservoirInitialSchedules[i - 1][repair.First()],
                             endVolume = reservoirInitialSchedules[i - 1][repair.Last() + 1];
-                        // Неконтролируемый скачек больше объема резервуара
-                        if (_sections[i - 1] == null && (endVolume - startVolume) > _reservoirVolumes[i - 1])
-                            return false;
 
-                        if (startVolume < 0 && endVolume > _reservoirVolumes[i - 1])
+                        if (startVolume  < 0 || startVolume > resVolume || endVolume > 0 || endVolume > resVolume)
                         {
-                            // Нужно на время ремонта уменьшить расход на предыдущей секции
-                            test = 0;
-                        }
-                        else if (startVolume > 0 && endVolume > _reservoirVolumes[i - 1])
-                        {
-                            // Нужно немного опорожнить резервуар
-                            test = 0;
-                        }
-                        else if (startVolume < 0 && endVolume < _reservoirVolumes[i - 1])
-                        {
-                            // Это странно....
-                            // Нужно немного наполнить резервуар
-                            test = 0;
-                        }
-                        else
-                        {
-                            // Этот ремонт не влияет ни на что
+                            double changeVolume = endVolume - startVolume;
+
+                            if (changeVolume < 0)
+                            {
+                                // Необъяснимо но факт
+                                return false;
+                            }
+                            else if (changeVolume > resVolume)
+                            {
+                                if (_sections[i - 1] == null)
+                                {
+                                    // Неконтролируемый скачек больше объема резервуара
+                                    return false;
+                                }
+                                else
+                                {
+                                    // Нужно уменьшать разницу между расходами
+                                    decision = Decision.DECREASE_FLOW_DIFFERENCE_INPUT_RESERVOIR;
+                                }
+                            }
+                            else if (startVolume > 0 && startVolume < resVolume && endVolume > resVolume)
+                            {
+                                // Нужно перед ремонтом опустошить резервуар 
+                                decision = Decision.DECREASE_LEVEL_INPUT_RESERVOIR;
+                                if (_sections[i - 1] == null)
+                                {
+                                    // за счет увеличения расхода в текущей секции
+                                }
+                                else
+                                {
+                                    // за счет уменьшения расхода на предыдущей секции
+                                }
+                            }
                         }
                     }
 
                     if (i < _resCount)
                     {
+                        double resVolume = _reservoirVolumes[i];
                         // Смотрим изменения в выходном резервуаре на данном участке
                         double startVolume = reservoirInitialSchedules[i][repair.First()],
                             endVolume = reservoirInitialSchedules[i][repair.Last() + 1];
-                        // Неконтролируемый скачек больше объема резервуара
-                        if (_sections[i + 1] == null && (startVolume - endVolume) > _reservoirVolumes[i])
-                            return false;
 
-                        if (startVolume > _reservoirVolumes[i] && endVolume < 0)
+                        if (startVolume < 0 || startVolume > resVolume || endVolume > 0 || endVolume > resVolume)
                         {
-                            // Нужно на время ремонта уменьшить расход на следующей секции
-                            test = 0;
-                        }
-                        else if (startVolume < _reservoirVolumes[i] && endVolume < 0)
-                        {
-                            double repairPumpVolume = _tempPumpSchedules[i].GetRange(repair[0], repairLen).Sum();
-                            //DecreaseRate(100, repair[0], repairLen, i + 1);
-                            breaker = true;
-                            break;
-                        }
-                        else if (startVolume > _reservoirVolumes[i] && endVolume > 0)
-                        {
-                            // Это странно....
-                            // Нужно немного опорожнить резервуар
-                            test = 0;
-                        }
-                        else
-                        {
-                            // Этот ремонт не влияет ни на что
-                        }
+                            double changeVolume = startVolume - endVolume;
 
+                            if (changeVolume < 0)
+                            {
+                                // Необъяснимо но факт
+                                return false;
+                            }
+                            else if (changeVolume > resVolume)
+                            {
+                                if (_sections[i + 1] == null)
+                                {
+                                    // Неконтролируемый скачек больше объема резервуара
+                                    return false;
+                                }
+                                else
+                                {
+                                    // Нужно уменьшать разницу между расходами
+                                    decision = decision | Decision.DECREASE_FLOW_DIFFERENCE_OUTPUT_RESERVOIR;
+                                }
+                            }
+                            else if (startVolume > 0 && startVolume < resVolume && endVolume < 0)
+                            {
+                                // Нужно перед ремонтом немного наполнить резервуар
+                                decision = decision | Decision.INCREASE_LEVEL_OUTPUT_RESERVOIR;
+                                if (_sections[i + 1] == null)
+                                {
+                                    // за счет увеличения расхода в текущей секции
+                                }
+                                else
+                                {
+                                    // за счет уменьшения расхода на следующей секции
+                                }
+                            }
+                        }
                     }
                 }
-                if (breaker)
-                    break;
+
+                if (Decision.)
             }
 
             CreateTempSolution();
             return true;
+        }
+
+        private static List<double[]> CreateInitialSchedule(List<Tuple<List<double[]>, List<int>>> initialSolution)
+        {
+            int period = initialSolution.Sum(x => x.Item2.Count());
+            var result = (new double[period][]).ToList();
+            foreach (var tuple in initialSolution)
+            {
+                tuple.Item2.Sort();
+                tuple.Item1.Sort((el1, el2) => el1[0] > el2[0] ? 1 : (el1[0] < el2[0] ? -1 : 0));
+                for (int i = 0; i < tuple.Item1.Count(); i++)
+                {
+                    result[tuple.Item2[i]] = tuple.Item1[i];
+                }
+            }
+            return result;
+        }
+
+        private static List<double[]> SwapBlocks(List<double[]> scheudule, List<int> block1, List<int> block2)
+        {
+            int blockSize = block1.Count();
+            List<double[]> result = scheudule.ToList();
+            for (int k = 0; k < blockSize; k++)
+            {
+                result[block1[k]] = scheudule[block2[k]];
+                result[block2[k]] = scheudule[block1[k]];
+            }
+            return result;
+        }
+
+        private static List<double> GetReservoirSchedule(List<double[]> inputSchedule, List<double[]> outputSchedule, List<double> pumpsSchedule, double startVolume)
+        {
+            List<double> result = new List<double>() { startVolume };
+            for (int i = 0; i < inputSchedule.Count(); i++)
+                result.Add(result.Last() + inputSchedule[i].Last() - outputSchedule[i].First() + pumpsSchedule[i]);
+            return result;
+        }
+
+        private static List<int> GetCrashIndexes(List<double> reservoirSchedule, double minVolume, double maxVolume)
+        {
+            var result = new List<int>();
+            for (int i = 1; i < reservoirSchedule.Count(); i++)
+            {
+                var x = reservoirSchedule[i];
+                if (x < minVolume || x > maxVolume)
+                {
+                    result.Add(i);
+                }
+            }
+            return result;
+        }
+
+        private static double GetOverfillVolume(List<double> reservoirSchedule, double minVolume, double maxVolume)
+        {
+            double result = 0.0;
+            for (int i = 1; i < reservoirSchedule.Count(); i++)
+            {
+                var x = reservoirSchedule[i];
+                if (x < minVolume)
+                {
+                    result += minVolume - x;
+                }
+                else if (x > maxVolume)
+                {
+                    result += x - maxVolume;
+                }
+            }
+            return result;
+        }
+
+        private static List<double[]> DecreaseRegime(ISection section, List<double[]> schedule, double volume, List<int> indexes, bool allowZero, bool input = true)
+        {
+            List<double[]> newSchedule = AlgorithmHelper.GetIndexes(schedule, indexes);
+            double newVolume = newSchedule.Sum(x => input ? x.First() : x.Last());
+            double oldSectionVolume = newVolume;
+            int len = indexes.Count();
+            while (true)
+            {
+                int zeroCounter = 0;
+                bool end = false;
+                for (int i = 0; i < len; i++)
+                {
+                    var idx = indexes[i];
+                    var lowerRegime = section.GetLowerRegime(idx, newSchedule[i], !input);
+                    if (lowerRegime != null)
+                    {
+                        if (input)
+                            newVolume -= newSchedule[i].First() - lowerRegime.First();
+                        else
+                            newVolume -= newSchedule[i].Last() - lowerRegime.Last();
+
+                        if (oldSectionVolume - newVolume > volume || newVolume < 0)
+                        {
+                            end = true;
+                            break;
+                        }
+                        newSchedule[i] = lowerRegime;
+                    }
+                    else
+                    {
+                        zeroCounter++;
+                    }
+                }
+
+                if (end)
+                    break;
+
+                if (zeroCounter == len)
+                {
+                    if (allowZero)
+                        for (int i = len - 1; i >= 0; i--)
+                        {
+                            if (input)
+                                newVolume -= newSchedule[i].First();
+                            else
+                                newVolume -= newSchedule[i].Last();
+
+                            if (oldSectionVolume - newVolume > volume || newVolume < 0)
+                                break;
+
+                            newSchedule[i] = new double[section.Dimension];
+                        }
+                    break;
+                }
+            }
+
+            return newSchedule;
         }
 
         #endregion

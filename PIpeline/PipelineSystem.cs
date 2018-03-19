@@ -80,7 +80,7 @@ namespace Pipeline
             DiscreteSchedule tu2MainRepairs = new DiscreteSchedule(Period, bigMaxflowValue);
             tu2MainRepairs.FillInterval(56.1 / 24, 10 * 24 + 12, 10 * 24 + 14);
             tu2MainRepairs.FillInterval(56.1 / 24, 11 * 24 + 12, 11 * 24 + 14);
-            //tu2MainRepairs.FillInterval(0, 11 * 24 + 16, 11 * 24 + 28);
+            tu2MainRepairs.FillInterval(0, 11 * 24 + 16, 11 * 24 + 28);
             tu2MainRepairs.FillInterval(56.1 / 24, 12 * 24 + 12, 12 * 24 + 14);
             tu2MainRepairs.FillInterval(56.1 / 24, 13 * 24 + 12, 13 * 24 + 14);
             tu2MainRepairs.FillInterval(56.1 / 24, 24 * 24 + 12, 24 * 24 + 14);
